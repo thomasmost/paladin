@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>finish-event</title>
+<div id="box" style="width:50px;height:50px;background:teal"></div>
+<script>
+let settled = false;
+const verdict = (title) => { if (!settled) { settled = true; document.title = title; } };
+const fail = (reason) => verdict('FAIL: ' + reason);
+addEventListener('error', (event) => fail(event.message));
+setTimeout(() => fail('no finish within 5s'), 5000);
+
+const anim = document.getElementById('box').animate(
+  [{ opacity: 1 }, { opacity: 0 }], 100);
+if (anim.playState !== 'running') fail('playState after animate() is ' + anim.playState);
+if (!anim.pending) fail('animation is not pending right after animate()');
+anim.onfinish = (event) => {
+  if (anim.playState !== 'finished') return fail('playState in onfinish is ' + anim.playState);
+  if (anim.currentTime !== 100) return fail('currentTime after finish is ' + anim.currentTime);
+  if (event.currentTime !== 100) return fail('event.currentTime is ' + event.currentTime);
+  if (typeof event.timelineTime !== 'number') return fail('event.timelineTime is ' + event.timelineTime);
+  if (event.target !== anim) return fail('event.target is not the animation');
+  verdict('PASS');
+};
+</script>

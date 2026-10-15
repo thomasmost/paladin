@@ -8,6 +8,12 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Added
 
+- Web Animations: `element.animate()` now plays its animation, and
+  `Animation` implements the timing model (`play`, `pause`, `cancel`,
+  `finish`, `reverse`, `playbackRate`, `updatePlaybackRate`, `currentTime`,
+  `startTime`, `playState`, `pending`, `ready`, `finished`, `onfinish`,
+  `oncancel`). Animations do not change rendered style yet. Carried as a
+  patch in Paladin's Servo fork.
 - Cargo workspace with a Servo-free core crate, an engine crate, the `paladin`
   binary, and an `xtask` helper, with project conventions (README, CHANGELOG,
   CLAUDE.md, ROADMAP), the knight-on-pegasus logo with generated icons, and CI

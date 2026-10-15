@@ -286,7 +286,11 @@ Kept so nobody waits on upstream for them.
 Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
 (`paladin/0.22.0`), each listed against the upstream issue it addresses.
 
-None yet.
+- **S13 (Web Animations API), partial.** `thomasmost/servo`
+  `paladin/0.7.0`: "script: add the Web Animations timing calculations",
+  "script: add AnimationPlaybackEvent", "script: implement the Animation
+  timing model", "script: finish Element.animate()". Timing model only;
+  sampling follows in later patches. Upstream: servo/servo#36950.
 
 ## Resolved
 
