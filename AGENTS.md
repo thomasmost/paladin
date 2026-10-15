@@ -12,9 +12,9 @@ Cargo workspace (Rust 1.97.1 pinned in `rust-toolchain.toml`, edition 2024).
 
 | Crate                   | What it is |
 | ----------------------- | ---------- |
-| `crates/paladin-core`   | `paladin-core` — the Servo-free model: `Browser`/`Window`/`Tab`, `Command` and `dispatch`, `EngineEvent` and `apply`, `Keymap`, `Settings` (TOML), `Profile` paths. Depends on neither servo, egui, nor winit. |
-| `crates/paladin-engine` | `paladin-engine` — the only crate that imports `servo`. `Engine` (one per process), `GlSurface` (a window's GL context), `TabHost` (the tabs of one window, painted offscreen), `DelegateState` (Servo callbacks → `EngineEvent`). |
-| `crates/paladin`        | `paladin` — the binary: winit `App`, `BrowserWindow` (egui chrome over the tab host), `SettingsWindow`, winit-to-engine input mapping, `routing.rs` (pure, unit-tested pointer/key routing and page-area geometry), `chrome.rs` (pure chrome drawing that returns `Command`s), icons, cargo-packager metadata. |
+| `crates/paladin-core`   | `paladin-core` — the Servo-free model: `model` (`Browser`/`Window`/`Tab`), `command` (`Command`, `dispatch`, `EngineAction`), `event` (`EngineEvent`, `apply`), `keymap` (`Keymap`, `KeyChord`, `CommandKind`), `settings` (TOML), `profile` (paths). Depends on neither servo, egui, nor winit. |
+| `crates/paladin-engine` | `paladin-engine` — the only crate that imports `servo`. `engine.rs` (`Engine`, one per process), `host.rs` (`GlSurface`, a window's GL context; `TabHost`, the tabs of one window painted offscreen), `input.rs` (`EngineInput`), `delegate.rs` (Servo callbacks → `EngineEvent`). Re-exports `keyboard_types` and `PhysicalSize`. |
+| `crates/paladin`        | `paladin` — the binary: `app.rs` (winit `App`), `window.rs` (`BrowserWindow`, egui chrome over the tab host), `settings_window.rs`, `chrome.rs` (pure chrome drawing that returns `Command`s), `routing.rs` (pure, unit-tested pointer/key routing and page-area geometry), `input.rs` (winit → `EngineInput`, `route_key`), `keyutils.rs` (winit keys → `keyboard-types`, copied from servoshell, MPL-2.0 header must stay), `icon.rs`, and the cargo-packager metadata in its `Cargo.toml`. |
 | `xtask`                 | `cargo xtask icons` (logo → icns/ico/png) and `cargo xtask angle-dlls` (Windows ANGLE DLLs next to the binaries). |
 
 Data flow: the chrome and the keymap emit `Command`s; `paladin_core::dispatch`
@@ -30,7 +30,9 @@ Local setup is in `README.md`.
 
 Run from the repo root:
 
-- `cargo run -- [--profile <name>] [<url>...]` — run the browser.
+- `cargo run -- [--profile <name>] [<url>...]` — run the browser. The
+  workspace sets `default-members = ["crates/paladin"]`, so plain `cargo
+  build`/`cargo test` touch only the binary; pass `--workspace` for the rest.
 - `cargo test --workspace` — unit tests plus the headless engine test (slow
   the first time: it builds Servo).
 - `cargo clippy --workspace --all-targets -- -D warnings` — lint.
@@ -63,6 +65,17 @@ Run from the repo root:
 - **Every user action is a `Command`.** New chrome controls and shortcuts add
   a `Command` (and a `CommandKind` if it needs a hotkey), never a direct
   engine call.
+- **Key routing has one rule.** It lives in `input::route_key` (Cmd/Ctrl
+  chords fire even in the address bar; otherwise egui while focused, then
+  bound chords on initial press, then the page). Browser windows apply it via
+  `routing::KeyRouter`, which sends repeats and releases to the side that got
+  the press. Change routing there, with a unit test, not in `window.rs`.
+- **Packaging metadata** is `[package.metadata.packager]` in
+  `crates/paladin/Cargo.toml`. cargo-packager resolves its paths against that
+  crate's directory (hence `../../`). It deliberately lists no `formats`
+  (0.11.8 fails on formats the host can't build); the per-host default is
+  app+dmg on macOS, NSIS on Windows. The `target/release/*.dll` resources glob
+  assumes the default target dir and no `--target`.
 - **Generated icons are committed.** Edit `assets/logo.svg`, run
   `cargo xtask icons`, commit the result. Never hand-edit `assets/icons/`.
 - **Format before every commit:** `cargo fmt --all`. CI fails on formatting
