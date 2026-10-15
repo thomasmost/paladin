@@ -38,3 +38,15 @@ releases yet; `Unreleased` holds everything on `main`.
   `javascript:` URLs are refused. Releasing one mouse button no longer ends
   a drag that another button still holds, and a popup tab the engine lost
   is closed instead of left blank.
+- Settings window: the form is drawn on the panel fill and the framebuffer is
+  cleared before each frame, so the background no longer shows undefined
+  pixels (dark text on black in light mode, or stale pixels from a reused
+  buffer). A crashed tab's error panel fills the page area the same way.
+- Releasing a modifier such as Meta after a shortcut changed the active tab
+  now goes to the tab that received its press, so no tab keeps a key down
+  and the new tab never gets a lone release. A held key whose tab closed is
+  dropped.
+- Settings: the homepage and new-tab URL fields are stored normalised on
+  commit, so `example.com` becomes `https://example.com/` as it does in the
+  address bar. Text that is not a URL is kept as typed and marked "Not a
+  URL".
