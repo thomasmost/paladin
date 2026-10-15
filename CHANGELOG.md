@@ -14,4 +14,7 @@ releases yet; `Unreleased` holds everything on `main`.
   on macOS and Windows.
 - Servo-free core model: windows and tabs, named commands with a pure
   `dispatch`, engine events with a pure `apply`, a keymap with macOS and
-  Windows defaults, TOML settings, and per-OS profile directories.
+  Windows defaults, TOML settings, and per-OS profile directories. Profile
+  names reject trailing dots and Windows device names (`CON`, `COM1`, and so
+  on) on every platform, settings are saved atomically, and Back and Forward
+  clear a crashed tab's error panel.
