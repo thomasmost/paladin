@@ -293,7 +293,8 @@ Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
   rendering update for queued animation events", "script: tick script
   animations on their own timeline", "script: use expect for the unused
   sequence number", "script: tidy the simple iteration progress check and
-  event queue note". Timing model only; sampling follows in later patches.
+  event queue note", "script: clarify why the animation sequence number is
+  unused". Timing model only; sampling follows in later patches.
   Upstream: servo/servo#36950.
 
 ## Resolved

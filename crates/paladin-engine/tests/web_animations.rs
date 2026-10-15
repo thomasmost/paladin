@@ -27,7 +27,7 @@ const PAGES: &[&str] = &[
     "playback-rate-scales.html",
     "cancel-paused-no-frame.html",
     "finish-paused-no-frame.html",
-    "seek-end-paused-no-frame.html",
+    "seek-end-finish-event.html",
     "finish-method.html",
     "time-setters.html",
     "update-playback-rate-pending.html",

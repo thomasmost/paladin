@@ -28,9 +28,19 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   // stays there, so the time is not advanced by any timeline.
   if (anim.currentTime !== 0) return fail('currentTime with a null timeline is ' + anim.currentTime);
 
+  // Giving the animation a timeline registers it with the document again, so
+  // its pending play task runs and ready resolves. If it were not registered,
+  // nothing would run that task: ready would never resolve and the guard at
+  // the top of the page would report the failure.
+  anim.timeline = document.timeline;
+  await anim.ready;
+  if (anim.pending) return fail('still pending after a timeline was set');
+  if (anim.playState !== 'running') return fail('playState after a timeline was set is ' + anim.playState);
+
   // Setting the timeline to null on a running animation unresolves its
-  // current time, and nothing advances it while it has no timeline.
-  const running = box.animate(keyframes, 100000);
+  // current time, and nothing advances it while it has no timeline. The
+  // duration is 1 s so that the restored animation below finishes soon.
+  const running = box.animate(keyframes, 1000);
   await running.ready;
   running.timeline = null;
   if (running.timeline !== null) return fail('timeline after null assignment is ' + running.timeline);
@@ -40,7 +50,18 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   // Restoring a document timeline resumes the animation from its unresolved time.
   running.timeline = document.timeline;
-  if (running.currentTime === null) return fail('currentTime stays null after the timeline is restored');
+  const restored = running.currentTime;
+  if (restored === null) return fail('currentTime stays null after the timeline is restored');
+  // Its time advances while it runs on the restored timeline.
+  await sleep(300);
+  if (!(running.currentTime > restored)) {
+    return fail('currentTime did not advance after the timeline was restored: ' + restored + ' -> ' + running.currentTime);
+  }
+  // Finishing needs the animation to be ticked by the document again, which
+  // only happens when it is registered again. Without that, finished never
+  // resolves and the guard reports the failure.
+  await running.finished;
+  if (running.playState !== 'finished') return fail('playState after finishing is ' + running.playState);
   verdict('PASS');
 })().catch((e) => fail(e.message));
 </script>
