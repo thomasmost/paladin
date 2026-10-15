@@ -102,7 +102,7 @@ fn is_valid_name(name: &str) -> bool {
         && !is_windows_device_name(name.split('.').next().unwrap_or(name))
 }
 
-/// `CON`, `PRN`, `AUX`, `NUL`, `COM1`-`COM9`, and `LPT1`-`LPT9`, compared
+/// `CON`, `PRN`, `AUX`, `NUL`, `COM0`-`COM9`, and `LPT0`-`LPT9`, compared
 /// case-insensitively. Windows reserves these even with an extension, so
 /// callers pass the part of the name before the first `.`.
 fn is_windows_device_name(stem: &str) -> bool {
@@ -113,7 +113,7 @@ fn is_windows_device_name(stem: &str) -> bool {
             let bytes = upper.as_bytes();
             bytes.len() == 4
                 && (upper.starts_with("COM") || upper.starts_with("LPT"))
-                && matches!(bytes[3], b'1'..=b'9')
+                && bytes[3].is_ascii_digit()
         }
     }
 }
@@ -153,7 +153,8 @@ mod tests {
     #[test]
     fn rejects_windows_device_names_in_any_case_and_with_an_extension() {
         let reserved = [
-            "con", "CON", "Prn", "aux", "nul", "com1", "COM9", "lpt1", "LPT9", "con.txt", "Nul.log",
+            "con", "CON", "Prn", "aux", "nul", "com0", "com1", "COM9", "lpt0", "LPT9", "con.txt",
+            "Nul.log",
         ];
         for bad in reserved {
             assert_eq!(
@@ -162,7 +163,7 @@ mod tests {
                 "{bad:?} should be rejected"
             );
         }
-        for ok in ["console", "com10", "lpt0", "COM", "nul2", "a.con"] {
+        for ok in ["console", "com10", "COM", "nul2", "a.con"] {
             assert!(
                 Profile::resolve_under(Path::new("/cfg"), ok).is_ok(),
                 "{ok:?} should be accepted"
