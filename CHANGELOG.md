@@ -32,6 +32,6 @@ releases yet; `Unreleased` holds everything on `main`.
 
 - Address bar: `localhost/path` and bare IPv4 addresses such as
   `192.168.1.1:8080` now parse, `localhostfoo.com` gets `https://`, and
-  `javascript:` URLs are refused. A press of one mouse button no longer ends
-  a click that another button still holds, and a popup tab the engine lost
+  `javascript:` URLs are refused. Releasing one mouse button no longer ends
+  a drag that another button still holds, and a popup tab the engine lost
   is closed instead of left blank.
