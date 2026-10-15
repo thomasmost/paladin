@@ -52,3 +52,5 @@ releases yet; `Unreleased` holds everything on `main`.
   commit, so `example.com` becomes `https://example.com/` as it does in the
   address bar. Text that is not a URL is kept as typed and marked "Not a
   URL".
+- Windows release builds no longer open a console window next to the app;
+  debug builds keep it for logs.

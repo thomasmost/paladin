@@ -1,5 +1,9 @@
 //! Paladin: a desktop browser on the Servo engine with an egui chrome.
 
+// Release builds on Windows are GUI-subsystem apps, so the Start menu shortcut
+// opens no console window. Debug builds keep the console for logs.
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
 mod app;
 mod chrome;
 mod icon;
