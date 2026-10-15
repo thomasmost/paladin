@@ -167,9 +167,9 @@ Upstream causes and the features they block are tracked in
 `docs/upstream-issues.md`.
 
 - No audio or video playback (Servo's `media-gstreamer` feature is off).
-- Textareas whose `line-height` exceeds their font size clip their text,
-  because Servo sizes `rows` from the font size: Google's search box cuts
-  off descenders while you type.
+- Textareas sized by their `rows` attribute are shorter than in other
+  browsers (Servo uses rows × font size, not rows × line height), so one-row
+  fields such as Google's search box cut off descenders.
 - No search engine: address-bar text that is not a URL is ignored.
 - Stop is disabled while a page loads (Servo 0.7.0 has no API for it).
 - No macOS application menu: winit's default menu is turned off so that
@@ -188,5 +188,5 @@ Upstream causes and the features they block are tracked in
 - [ ] Phase 2: remappable hotkeys, profiles, moving tabs between windows
 - [ ] Media playback (the `media-gstreamer` feature is off; no audio or video)
 - [ ] A search engine for address-bar text that is not a URL
-- [ ] IME composition for page text fields: egui-winit disables IME while no chrome field has focus
+- [ ] IME composition for page text fields: forward Servo's input-method control to winit's `set_ime_allowed`; egui-winit only enables IME for its own fields
 - [ ] Restore previous windows on launch (the setting is stored but not acted on)

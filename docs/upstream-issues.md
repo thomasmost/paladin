@@ -31,20 +31,23 @@ or starts with the workaround noted in the entry.
 - **Phase 1 polish**
   - Enable the Stop button: [S1](#s1-no-way-to-stop-a-load).
   - Google's search box clips descenders: [S2](#s2-textarea-rows-sizing-uses-the-font-size).
-  - Fades and masks (Google's search box edges, Wikipedia logos):
-    [S3](#s3-mask-image-unsupported).
+  - Fades and masks (Google's search box edges; wikipedia.org logs the same
+    warning): [S3](#s3-mask-image-unsupported).
   - Ellipsis on overflowing titles and labels:
     [S4](#s4-text-overflow-unsupported).
   - Clean stderr on exit: [S6](#s6-memory-profiler-warnings-on-exit).
-  - IME composition in page text fields:
-    [E1](#e1-egui-winit-disables-ime-while-no-chrome-field-has-focus).
   - Quiet `cargo build` on macOS:
     [T1](#t1-__eh_frame-section-too-large-linker-warning-on-macos).
   - Style-thread stack overflow on wikipedia.org: resolved by
     [S5](#s5-style-threads-overflow-their-512-kb-stack-resolved-in-paladin).
+  - Packaging on both hosts: worked around in
+    [T2](#t2-cargo-packager-0118-fails-on-formats-the-host-cannot-build).
+  - IME composition in page text fields: not upstream after all; see
+    [Checked and not upstream](#checked-and-not-upstream).
 - **Phase 2 (hotkeys, profiles, tab moves)**
   - Named profiles with separate cookies and storage:
-    [S7](#s7-no-profile-concept-site-data-is-per-process).
+    [S7](#s7-no-profile-concept-site-data-is-per-process) and
+    [S12](#s12-one-servo-instance-per-process).
   - Moving a tab to another window: [S8](#s8-a-webview-is-bound-to-its-rendering-context).
   - Remappable hotkeys: no upstream dependency.
 - **Phase 3 (extensions)**
@@ -61,8 +64,10 @@ or starts with the workaround noted in the entry.
 ### S1: No way to stop a load
 
 - **Upstream:** no issue found. `WebView` in servo 0.7.0 has `load`,
-  `reload`, `go_back`, and `go_forward` but no stop; the only `cancel` is on
-  a navigation request the delegate has not yet allowed.
+  `reload`, `go_back`, and `go_forward` but no stop. The closest controls
+  are `NavigationRequest::deny`, which refuses a navigation before it
+  starts, and `InterceptedWebResourceLoad::cancel`, which fails one
+  intercepted resource load; neither stops a load in progress.
 - **Effect:** the toolbar's Stop button is drawn disabled with a tooltip, and
   the Stop command logs a warning.
 - **Blocks:** enabling Stop (Phase 1 polish).
@@ -74,21 +79,24 @@ or starts with the workaround noted in the entry.
 - **Upstream:** adjacent issue [servo/servo#46562][46562] (open) covers `rows`
   being lost under `height: auto`; a maintainer there says textarea sizing
   should move from presentational hints into layout, which would fix this as
-  well. The mismatch itself has no issue yet.
+  well, and points at [servo/servo#44426][44426] as the counterpart on the
+  inline axis (form-control width hints handled outside layout). The
+  mismatch itself has no issue yet.
 - **What it is:** `components/script/dom/element/element.rs` synthesizes
   `height: <rows>em` for a textarea. The HTML spec defines the height as
-  rows times the line height. Any textarea whose `line-height` exceeds its
-  font size gets a content box too short for its own line, and `overflow`
-  then clips the text. Google's search box is `rows="1"` with
+  rows times the line height, and `line-height: normal` is already about
+  1.15 to 1.2 times the font size, so every textarea sized by `rows` is
+  shorter than in other browsers: `<textarea rows="5">` shows about four
+  lines. A one-row field gets a content box shorter than its own line and
+  `overflow` clips the glyphs. Google's search box is `rows="1"` with
   `line-height: 22px` and 16px text: the clip lands on the baseline and cuts
-  every descender. A plain `<textarea rows="1">` with wrapped text shows only
-  its first line.
+  every descender. Author-set heights are unaffected.
 - **Effect:** cosmetic but prominent; typing on google.com looks broken.
 - **Workaround:** none in Paladin. A user stylesheet forcing `height: auto`
   would fix Google and shrink every empty multi-row textarea elsewhere.
 - **Blocks:** nothing; a README Known limitations entry.
-- **When it lands:** remove the README entry; re-run checklist item 2 on
-  google.com.
+- **When it lands:** remove the README entry; re-run checklist item 6 (typing
+  in a page text field) on google.com.
 
 ### S3: `mask-image` unsupported
 
@@ -102,8 +110,8 @@ or starts with the workaround noted in the entry.
 
 ### S4: `text-overflow` unsupported
 
-- **Upstream:** [servo/servo#13702][13702] (open); partial work in
-  [servo/servo#40444][40444].
+- **Upstream:** [servo/servo#13702][13702] (open); [servo/servo#40444][40444]
+  is a tracking issue for basic ellipsis support.
 - **What it is:** `text-overflow: ellipsis` is ignored, so overflowing text is
   cut rather than elided. Seen in the logs on wikipedia.org.
 - **Effect:** cosmetic on pages.
@@ -134,11 +142,12 @@ or starts with the workaround noted in the entry.
 - **Upstream:** no issue found. Cookies and storage live in Servo's per-process
   data directory. [servo/servo#47126][47126] (open) extends the embedder
   cookie API (`SiteDataManager`) and is the closest active work.
-- **Effect:** Paladin cannot run two profiles in one process.
-- **Workaround (Phase 2 design):** one Paladin process per profile, with a
+- **Effect:** Paladin cannot run two profiles in one process; see also
+  [S12](#s12-one-servo-instance-per-process).
+- **Workaround (ROADMAP, Phase 2):** one Paladin process per profile, with a
   `profiles.toml` registry and a launcher.
-- **Blocks:** nothing; it shapes the Phase 2 design. In-process profiles
-  would need per-`WebView` site data upstream.
+- **Blocks:** nothing; it shapes Phase 2. In-process profiles would need
+  per-`WebView` site data upstream, and S12 resolved.
 
 ### S8: A `WebView` is bound to its rendering context
 
@@ -146,8 +155,9 @@ or starts with the workaround noted in the entry.
   ties a webview to one rendering context, and in Paladin each window owns
   its own GL context.
 - **Effect:** a tab cannot be moved to another window with its live page.
-- **Workaround (Phase 2 design):** moving a tab is a close plus a create with
-  the same URL and a history replay.
+- **Workaround (ROADMAP, Phase 2):** moving a tab is a close plus a create
+  with the same URL. Servo 0.7.0 has no API to restore session history, so
+  the moved tab starts with an empty history.
 - **Blocks:** moving a live tab, with its scroll position, form state, and
   session history, between windows.
 
@@ -174,23 +184,38 @@ or starts with the workaround noted in the entry.
 
 ### S11: No WebExtension support
 
-- **Upstream:** no issue found; Servo has no WebExtension work scheduled.
+- **Upstream:** no issue for the API surface itself; the only related issue
+  is S9's [servo/servo#13263][13263], which the design plan refers to.
+  Servo has no WebExtension work scheduled.
 - **Effect:** Phase 3 depends on building the API surface in Paladin on top of
   S9 and S10, or on a different engine. `ROADMAP.md` records this as the
   likeliest reason to revisit the engine choice.
 - **Blocks:** Phase 3.
 
-## egui and winit
+### S12: One Servo instance per process
 
-### E1: egui-winit disables IME while no chrome field has focus
+- **Upstream:** no issue found. Servo's options and preferences are
+  process-global, and its accessibility layer assumes a single instance; the
+  design plan lists this under the Servo facts that constrain the design.
+- **Effect:** Paladin creates one `Engine` per process, and the engine test
+  binary holds a single test function (see `CLAUDE.md`).
+- **Blocks:** in-process profiles, together with
+  [S7](#s7-no-profile-concept-site-data-is-per-process).
 
-- **Upstream:** no issue found that matches; egui-winit sets the window's
-  IME-allowed state from whether egui wants text input.
-- **Effect:** composition for Japanese, Chinese, and Korean input does not
-  work in page text fields, only in the address bar and settings fields.
-- **Workaround:** none yet. Paladin could keep IME allowed whenever a page
-  text field has focus, which needs a focus signal from Servo.
-- **Blocks:** IME in pages (README todo).
+## Checked and not upstream
+
+Things that looked like upstream limits and turned out to be Paladin work.
+Kept so nobody waits on upstream for them.
+
+- **IME composition in page text fields.** egui-winit only enables the
+  window's IME when one of its own widgets wants text input (egui-winit
+  0.34.3, `src/lib.rs` around line 1105), so page fields get none. Servo
+  0.7.0 already tells the embedder when an editable element gains or loses
+  focus: `WebViewDelegate::show_embedder_control` with
+  `EmbedderControl::InputMethod` and `hide_embedder_control`
+  (servo-0.7.0, `webview_delegate.rs`). Paladin has to forward that to
+  winit's `set_ime_allowed` and keep egui-winit's `State::set_allow_ime` in
+  step so egui does not switch it back. Listed in the README todo.
 
 ## Toolchain and packaging
 
@@ -198,7 +223,8 @@ or starts with the workaround noted in the entry.
 
 - **Upstream:** [rust-lang/rust#159105][159105] (open, "false positive?").
 - **What it is:** `cargo build` prints a `linker_messages` warning because
-  of Servo's size. Clippy does not link, so CI stays clean.
+  of Servo's size. CI's build step prints it too, but only clippy runs with
+  `-D warnings`, and clippy does not link, so CI passes.
 - **Effect:** noise in local builds.
 - **Blocks:** nothing.
 
@@ -220,6 +246,7 @@ it up. None yet.
 [13925]: https://github.com/servo/servo/issues/13925
 [40444]: https://github.com/servo/servo/issues/40444
 [43888]: https://github.com/servo/servo/pull/43888
+[44426]: https://github.com/servo/servo/issues/44426
 [46562]: https://github.com/servo/servo/issues/46562
 [47126]: https://github.com/servo/servo/issues/47126
 [47370]: https://github.com/servo/servo/issues/47370
