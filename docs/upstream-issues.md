@@ -46,8 +46,8 @@ or starts with the workaround noted in the entry.
     [Checked and not upstream](#checked-and-not-upstream).
 - **Phase 2 (hotkeys, profiles, tab moves)**
   - Named profiles with separate cookies and storage:
-    [S7](#s7-no-profile-concept-site-data-is-per-process) and
-    [S12](#s12-one-servo-instance-per-process).
+    [S7](#s7-no-profile-concept-site-data-is-per-process) or
+    [S12](#s12-one-servo-instance-per-process), whichever lands first.
   - Moving a tab to another window: [S8](#s8-a-webview-is-bound-to-its-rendering-context).
   - Remappable hotkeys: no upstream dependency.
 - **Phase 3 (extensions)**
@@ -111,7 +111,7 @@ or starts with the workaround noted in the entry.
 ### S4: `text-overflow` unsupported
 
 - **Upstream:** [servo/servo#13702][13702] (open); [servo/servo#40444][40444]
-  is a tracking issue for basic ellipsis support.
+  (open) proposes basic ellipsis support as a first step.
 - **What it is:** `text-overflow: ellipsis` is ignored, so overflowing text is
   cut rather than elided. Seen in the logs on wikipedia.org.
 - **Effect:** cosmetic on pages.
@@ -147,7 +147,8 @@ or starts with the workaround noted in the entry.
 - **Workaround (ROADMAP, Phase 2):** one Paladin process per profile, with a
   `profiles.toml` registry and a launcher.
 - **Blocks:** nothing; it shapes Phase 2. In-process profiles would need
-  per-`WebView` site data upstream, and S12 resolved.
+  per-`WebView` site data upstream, or S12 resolved so each profile can have
+  its own instance.
 
 ### S8: A `WebView` is bound to its rendering context
 
@@ -199,8 +200,12 @@ or starts with the workaround noted in the entry.
   design plan lists this under the Servo facts that constrain the design.
 - **Effect:** Paladin creates one `Engine` per process, and the engine test
   binary holds a single test function (see `CLAUDE.md`).
-- **Blocks:** in-process profiles, together with
+- **Blocks:** in-process profiles, as an alternative route to resolving
   [S7](#s7-no-profile-concept-site-data-is-per-process).
+
+## egui and winit
+
+None yet. The IME item looked like one; see Checked and not upstream.
 
 ## Checked and not upstream
 
@@ -214,8 +219,12 @@ Kept so nobody waits on upstream for them.
   focus: `WebViewDelegate::show_embedder_control` with
   `EmbedderControl::InputMethod` and `hide_embedder_control`
   (servo-0.7.0, `webview_delegate.rs`). Paladin has to forward that to
-  winit's `set_ime_allowed` and keep egui-winit's `State::set_allow_ime` in
-  step so egui does not switch it back. Listed in the README todo.
+  winit's `set_ime_allowed`, taking egui-winit's per-frame debounce into
+  account: it recomputes its own flag every frame and calls
+  `set_ime_allowed` whenever that differs from its stored value, so Paladin
+  must leave the stored flag to egui and re-assert `set_ime_allowed(true)`
+  after each `handle_platform_output` while a page control is shown. Listed
+  in the README todo.
 
 ## Toolchain and packaging
 
