@@ -1,0 +1,226 @@
+# Upstream issues
+
+Paladin is a shell around Servo, egui, and winit. Some things Paladin cannot
+do, or does badly, are upstream limits rather than Paladin bugs. This file
+tracks each one: what it is, which Paladin features or improvements depend on
+it, what Paladin does in the meantime, and what to do when it lands.
+
+_State recorded as of 2026-10-15, against Servo 0.7.0, egui 0.34, winit 0.30._
+
+## How to maintain this file
+
+- Add an entry when a bug or a planned feature turns out to depend on an
+  upstream change. Give it the next id in its group (`S` Servo, `E` egui and
+  winit, `T` toolchain and packaging). Link the upstream issue if one exists;
+  say "no upstream issue found" otherwise, so the next person knows to file
+  or search again.
+- On every Servo bump, re-check each `S` entry: the state, whether the
+  workaround can go, and whether the dependent feature is now unblocked.
+- When an entry is resolved upstream and Paladin has picked the fix up, move
+  it to the Resolved section rather than deleting it: the history explains
+  workarounds that remain in the code.
+- `README.md` lists the user-visible limitations in one sentence each and
+  points here for the detail.
+
+## Dependency tree
+
+Paladin work, grouped by roadmap phase, with the upstream entry each item
+depends on. An item under an entry does not start until that entry resolves,
+or starts with the workaround noted in the entry.
+
+- **Phase 1 polish**
+  - Enable the Stop button: [S1](#s1-no-way-to-stop-a-load).
+  - Google's search box clips descenders: [S2](#s2-textarea-rows-sizing-uses-the-font-size).
+  - Fades and masks (Google's search box edges, Wikipedia logos):
+    [S3](#s3-mask-image-unsupported).
+  - Ellipsis on overflowing titles and labels:
+    [S4](#s4-text-overflow-unsupported).
+  - Clean stderr on exit: [S6](#s6-memory-profiler-warnings-on-exit).
+  - IME composition in page text fields:
+    [E1](#e1-egui-winit-disables-ime-while-no-chrome-field-has-focus).
+  - Quiet `cargo build` on macOS:
+    [T1](#t1-__eh_frame-section-too-large-linker-warning-on-macos).
+  - Style-thread stack overflow on wikipedia.org: resolved by
+    [S5](#s5-style-threads-overflow-their-512-kb-stack-resolved-in-paladin).
+- **Phase 2 (hotkeys, profiles, tab moves)**
+  - Named profiles with separate cookies and storage:
+    [S7](#s7-no-profile-concept-site-data-is-per-process).
+  - Moving a tab to another window: [S8](#s8-a-webview-is-bound-to-its-rendering-context).
+  - Remappable hotkeys: no upstream dependency.
+- **Phase 3 (extensions)**
+  - Content scripts: [S9](#s9-isolated-worlds).
+  - Extension-to-browser messaging: [S10](#s10-host-to-dom-message-port).
+  - The WebExtension API surface itself: [S11](#s11-no-webextension-support).
+  - Building blocks that already exist in Servo 0.7.0: `UserContentManager`
+    (user scripts and styles injected into every page) and
+    `WebView::evaluate_javascript`. Both run in the page's own world, so they
+    cover user styles and simple user scripts, not isolated content scripts.
+
+## Servo
+
+### S1: No way to stop a load
+
+- **Upstream:** no issue found. `WebView` in servo 0.7.0 has `load`,
+  `reload`, `go_back`, and `go_forward` but no stop; the only `cancel` is on
+  a navigation request the delegate has not yet allowed.
+- **Effect:** the toolbar's Stop button is drawn disabled with a tooltip, and
+  the Stop command logs a warning.
+- **Blocks:** enabling Stop (Phase 1 polish).
+- **When it lands:** wire `Command::Stop` to the new method in
+  `paladin-engine`, enable the button, update the README checklist item 3.
+
+### S2: Textarea `rows` sizing uses the font size
+
+- **Upstream:** adjacent issue [servo/servo#46562][46562] (open) covers `rows`
+  being lost under `height: auto`; a maintainer there says textarea sizing
+  should move from presentational hints into layout, which would fix this as
+  well. The mismatch itself has no issue yet.
+- **What it is:** `components/script/dom/element/element.rs` synthesizes
+  `height: <rows>em` for a textarea. The HTML spec defines the height as
+  rows times the line height. Any textarea whose `line-height` exceeds its
+  font size gets a content box too short for its own line, and `overflow`
+  then clips the text. Google's search box is `rows="1"` with
+  `line-height: 22px` and 16px text: the clip lands on the baseline and cuts
+  every descender. A plain `<textarea rows="1">` with wrapped text shows only
+  its first line.
+- **Effect:** cosmetic but prominent; typing on google.com looks broken.
+- **Workaround:** none in Paladin. A user stylesheet forcing `height: auto`
+  would fix Google and shrink every empty multi-row textarea elsewhere.
+- **Blocks:** nothing; a README Known limitations entry.
+- **When it lands:** remove the README entry; re-run checklist item 2 on
+  google.com.
+
+### S3: `mask-image` unsupported
+
+- **Upstream:** [servo/servo#13925][13925] (open since 2016).
+- **What it is:** `mask-image` and `-webkit-mask-image` are parsed as
+  unknown properties, so masks are dropped. Google fades the edges of its
+  search box with one; Wikipedia logs the same warning.
+- **Effect:** cosmetic; the logs show `Unsupported property declaration:
+  'mask-image'` on many sites.
+- **Blocks:** nothing.
+
+### S4: `text-overflow` unsupported
+
+- **Upstream:** [servo/servo#13702][13702] (open); partial work in
+  [servo/servo#40444][40444].
+- **What it is:** `text-overflow: ellipsis` is ignored, so overflowing text is
+  cut rather than elided. Seen in the logs on wikipedia.org.
+- **Effect:** cosmetic on pages.
+- **Blocks:** nothing.
+
+### S5: Style threads overflow their 512 KB stack (resolved in Paladin)
+
+- **Upstream:** [servo/servo#43888][43888] raised the stack Servo's own
+  builds use to 8 MiB; the stylo default stays 512 KB.
+- **What it was:** loading wikipedia.org in a debug build aborted with
+  `thread 'StyleThread#1' has overflowed its stack`.
+- **Paladin's fix:** `.cargo/config.toml` exports
+  `SERVO_STYLE_THREAD_STACK_SIZE_KB=8192` to every cargo invocation (commit
+  581c245). Keep it on every Servo bump; see `CLAUDE.md`.
+
+### S6: Memory profiler warnings on exit
+
+- **Upstream:** no issue found.
+- **What it is:** on a clean exit Servo logs several lines of
+  `profile_traits::mem` `Error communicating with the memory profiler
+  thread: Disconnected`. Exit code is 0 and nothing is lost.
+- **Effect:** noise on stderr that the README checklist's "no Servo error
+  output" items have to tolerate; they are WARN lines, not errors.
+- **Blocks:** nothing.
+
+### S7: No profile concept; site data is per process
+
+- **Upstream:** no issue found. Cookies and storage live in Servo's per-process
+  data directory. [servo/servo#47126][47126] (open) extends the embedder
+  cookie API (`SiteDataManager`) and is the closest active work.
+- **Effect:** Paladin cannot run two profiles in one process.
+- **Workaround (Phase 2 design):** one Paladin process per profile, with a
+  `profiles.toml` registry and a launcher.
+- **Blocks:** nothing; it shapes the Phase 2 design. In-process profiles
+  would need per-`WebView` site data upstream.
+
+### S8: A `WebView` is bound to its rendering context
+
+- **Upstream:** no issue found. `WebViewBuilder::new(servo, rendering_context)`
+  ties a webview to one rendering context, and in Paladin each window owns
+  its own GL context.
+- **Effect:** a tab cannot be moved to another window with its live page.
+- **Workaround (Phase 2 design):** moving a tab is a close plus a create with
+  the same URL and a history replay.
+- **Blocks:** moving a live tab, with its scroll position, form state, and
+  session history, between windows.
+
+### S9: Isolated worlds
+
+- **Upstream:** [servo/servo#13263][13263] (open since 2016, labelled
+  E-very-complex, last activity 2026-10-14).
+- **What it is:** no way to run a script in a page with access to the DOM but
+  its own global, which is what WebExtension content scripts require.
+- **Effect:** content scripts cannot be implemented faithfully. Scripts
+  injected through `UserContentManager` run in the page's world, where the
+  page can see and tamper with them.
+- **Blocks:** Phase 3 content scripts, and so most real extensions.
+
+### S10: Host-to-DOM message port
+
+- **Upstream:** [servo/servo#47370][47370], a roadmap proposal for an
+  embedder IPC primitive, closed as a duplicate in 2026-08 without a pointer
+  to the surviving issue. Search again before Phase 3 starts.
+- **What it is:** a structured, low-latency channel between page JavaScript
+  and the embedding application, beyond `evaluate_javascript` round trips.
+- **Blocks:** extension messaging (`runtime.sendMessage` and ports) and any
+  Paladin chrome that needs to talk to page scripts.
+
+### S11: No WebExtension support
+
+- **Upstream:** no issue found; Servo has no WebExtension work scheduled.
+- **Effect:** Phase 3 depends on building the API surface in Paladin on top of
+  S9 and S10, or on a different engine. `ROADMAP.md` records this as the
+  likeliest reason to revisit the engine choice.
+- **Blocks:** Phase 3.
+
+## egui and winit
+
+### E1: egui-winit disables IME while no chrome field has focus
+
+- **Upstream:** no issue found that matches; egui-winit sets the window's
+  IME-allowed state from whether egui wants text input.
+- **Effect:** composition for Japanese, Chinese, and Korean input does not
+  work in page text fields, only in the address bar and settings fields.
+- **Workaround:** none yet. Paladin could keep IME allowed whenever a page
+  text field has focus, which needs a focus signal from Servo.
+- **Blocks:** IME in pages (README todo).
+
+## Toolchain and packaging
+
+### T1: `__eh_frame section too large` linker warning on macOS
+
+- **Upstream:** [rust-lang/rust#159105][159105] (open, "false positive?").
+- **What it is:** `cargo build` prints a `linker_messages` warning because
+  of Servo's size. Clippy does not link, so CI stays clean.
+- **Effect:** noise in local builds.
+- **Blocks:** nothing.
+
+### T2: cargo-packager 0.11.8 fails on formats the host cannot build
+
+- **Upstream:** no issue found.
+- **What it is:** listing `formats` that include NSIS fails the macOS run.
+- **Paladin's fix:** the packaging metadata lists no `formats` and relies on
+  the per-host default (app and dmg on macOS, NSIS on Windows); see
+  `CLAUDE.md`.
+
+## Resolved
+
+Entries move here once upstream has shipped the fix and Paladin has picked
+it up. None yet.
+
+[13263]: https://github.com/servo/servo/issues/13263
+[13702]: https://github.com/servo/servo/issues/13702
+[13925]: https://github.com/servo/servo/issues/13925
+[40444]: https://github.com/servo/servo/issues/40444
+[43888]: https://github.com/servo/servo/pull/43888
+[46562]: https://github.com/servo/servo/issues/46562
+[47126]: https://github.com/servo/servo/issues/47126
+[47370]: https://github.com/servo/servo/issues/47370
+[159105]: https://github.com/rust-lang/rust/issues/159105

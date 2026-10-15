@@ -163,7 +163,13 @@ executable.
 
 ### Known limitations
 
+Upstream causes and the features they block are tracked in
+`docs/upstream-issues.md`.
+
 - No audio or video playback (Servo's `media-gstreamer` feature is off).
+- Textareas whose `line-height` exceeds their font size clip their text,
+  because Servo sizes `rows` from the font size: Google's search box cuts
+  off descenders while you type.
 - No search engine: address-bar text that is not a URL is ignored.
 - Stop is disabled while a page loads (Servo 0.7.0 has no API for it).
 - No macOS application menu: winit's default menu is turned off so that

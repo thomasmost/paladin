@@ -26,4 +26,5 @@ the window it was created in.
 Chrome or Firefox extensions. This depends on upstream Servo, which has no
 WebExtension support and no scheduled work toward it. It is the most likely
 reason to revisit the engine choice; the crate isolation from Phase 1 is what
-limits the cost of that revisit.
+limits the cost of that revisit. The upstream issues each phase depends on
+are tracked in `docs/upstream-issues.md`.

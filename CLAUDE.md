@@ -109,3 +109,7 @@ A task is complete only when:
 - Commit messages follow Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `ci:`).
 - Design plans live in `docs/design-plans/`; implementation plans in
   `docs/implementation-plans/`; the phase roadmap is `ROADMAP.md`.
+- `docs/upstream-issues.md` tracks the Servo, egui, winit, and toolchain
+  issues Paladin depends on and the features each one blocks. Add an entry
+  when a bug or feature turns out to be upstream; re-check every `S` entry on
+  a Servo bump.
