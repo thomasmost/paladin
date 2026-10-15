@@ -85,3 +85,55 @@ jobs:
       - name: sccache stats
         shell: bash
         run: ${SCCACHE_PATH} --show-stats
+
+  package:
+    name: package ${{ matrix.os }}
+    needs: check
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-2025]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.1
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install LLVM (Windows)
+        if: runner.os == 'Windows'
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "20.1"
+      - name: Set LIBCLANG_PATH (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: echo "LIBCLANG_PATH=$env:LLVM_PATH\bin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - uses: mozilla-actions/sccache-action@v0.0.11
+
+      # rust-cache restores ~/.cargo/bin, so this is a no-op after the first run.
+      - run: cargo install cargo-packager --version 0.11.8 --locked
+
+      - run: cargo build --release -p paladin
+      - name: Copy ANGLE DLLs next to the binary (Windows)
+        if: runner.os == 'Windows'
+        run: cargo xtask angle-dlls release
+
+      # macOS: Paladin.app and a .dmg. Windows: an NSIS installer. The
+      # installer and the .dmg are uploaded; a bare .app loses its
+      # executable bits in a zipped artifact, and the .dmg contains it.
+      - run: cargo packager --release -p paladin
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: paladin-${{ matrix.os }}
+          path: |
+            target/release/*.dmg
+            target/release/*-setup.exe
+          if-no-files-found: error
