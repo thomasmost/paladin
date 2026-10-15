@@ -98,8 +98,8 @@ pub fn dispatch(browser: &mut Browser, cmd: &Command) -> Vec<EngineAction> {
             }
             None => Vec::new(),
         },
-        Command::Back(tab) => pass_through(browser, *tab, EngineAction::Back(*tab)),
-        Command::Forward(tab) => pass_through(browser, *tab, EngineAction::Forward(*tab)),
+        Command::Back(tab) => history_step(browser, *tab, EngineAction::Back(*tab)),
+        Command::Forward(tab) => history_step(browser, *tab, EngineAction::Forward(*tab)),
         Command::Reload(tab) => match browser.tab_mut(*tab) {
             Some(t) => {
                 t.load = LoadState::Loading;
@@ -149,6 +149,18 @@ fn pass_through(browser: &Browser, tab: TabId, action: EngineAction) -> Vec<Engi
         vec![action]
     } else {
         Vec::new()
+    }
+}
+
+/// Back and Forward ask for a new load of the tab's content, so like
+/// `Reload` they clear a crashed tab's error panel.
+fn history_step(browser: &mut Browser, tab: TabId, action: EngineAction) -> Vec<EngineAction> {
+    match browser.tab_mut(tab) {
+        Some(t) => {
+            t.crashed = None;
+            vec![action]
+        }
+        None => Vec::new(),
     }
 }
 
@@ -486,6 +498,28 @@ mod tests {
         );
         assert!(dispatch(&mut b, &Command::Back(TabId(99))).is_empty());
         assert!(dispatch(&mut b, &Command::Reload(TabId(99))).is_empty());
+    }
+
+    #[test]
+    fn back_clears_a_crashed_tab() {
+        let (mut b, _, tab) = one_window();
+        b.tab_mut(tab).unwrap().crashed = Some("boom".to_string());
+        assert_eq!(
+            dispatch(&mut b, &Command::Back(tab)),
+            vec![EngineAction::Back(tab)]
+        );
+        assert_eq!(b.tab(tab).unwrap().crashed, None);
+    }
+
+    #[test]
+    fn forward_clears_a_crashed_tab() {
+        let (mut b, _, tab) = one_window();
+        b.tab_mut(tab).unwrap().crashed = Some("boom".to_string());
+        assert_eq!(
+            dispatch(&mut b, &Command::Forward(tab)),
+            vec![EngineAction::Forward(tab)]
+        );
+        assert_eq!(b.tab(tab).unwrap().crashed, None);
     }
 
     #[test]
