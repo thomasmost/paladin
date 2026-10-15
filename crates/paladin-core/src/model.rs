@@ -1,5 +1,7 @@
 //! Windows, tabs, and the identifiers that cross crate boundaries.
 
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -25,12 +27,14 @@ pub enum LoadState {
     Complete,
 }
 
-/// A decoded favicon, straight RGBA8, row-major, top-left origin.
+/// A decoded favicon, straight RGBA8, row-major, top-left origin. The pixels
+/// sit behind an `Arc` so a renderer can tell a new icon from the one it
+/// already uploaded by pointer, without hashing the pixels every frame.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Favicon {
     pub width: u32,
     pub height: u32,
-    pub rgba: Vec<u8>,
+    pub rgba: Arc<[u8]>,
 }
 
 /// One page shown as a tab.

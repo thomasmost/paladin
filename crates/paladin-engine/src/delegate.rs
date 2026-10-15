@@ -212,7 +212,7 @@ fn favicon_from_pixels(
     Some(Favicon {
         width,
         height,
-        rgba,
+        rgba: rgba.into(),
     })
 }
 
@@ -221,7 +221,7 @@ mod tests {
     use super::{PixelFormat, favicon_from_pixels};
 
     fn rgba_of(format: PixelFormat, width: u32, height: u32, data: &[u8]) -> Option<Vec<u8>> {
-        favicon_from_pixels(format, width, height, data).map(|f| f.rgba)
+        favicon_from_pixels(format, width, height, data).map(|f| f.rgba.to_vec())
     }
 
     #[test]

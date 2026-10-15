@@ -144,6 +144,8 @@ fn with_tab(browser: &mut Browser, tab: TabId, f: impl FnOnce(&mut Tab)) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
+
     use crate::command::{Command, dispatch, open_window};
     use crate::model::WindowId;
     use crate::model::test_support::{browser, url};
@@ -232,7 +234,7 @@ mod tests {
         let favicon = Favicon {
             width: 1,
             height: 1,
-            rgba: vec![255, 0, 0, 255],
+            rgba: Arc::from(vec![255, 0, 0, 255]),
         };
         apply(
             &mut b,
