@@ -6,6 +6,7 @@
 
 mod app;
 mod chrome;
+mod fatal;
 mod icon;
 mod input;
 mod keyutils;
@@ -23,6 +24,7 @@ use url::Url;
 use winit::event_loop::{ControlFlow, EventLoop};
 
 use crate::app::{App, AppEvent};
+use crate::fatal::report_fatal;
 
 #[derive(Parser, Debug)]
 #[command(name = "paladin", version, about = "Paladin desktop browser")]
@@ -41,21 +43,24 @@ fn main() -> ExitCode {
     let profile = match Profile::resolve(&cli.profile) {
         Ok(p) => p,
         Err(e) => {
-            eprintln!("paladin: {e}");
+            report_fatal(&format!("paladin: {e}"));
             return ExitCode::FAILURE;
         }
     };
     if let Err(e) = profile.ensure_dirs() {
-        eprintln!(
+        report_fatal(&format!(
             "paladin: cannot create profile directory {}: {e}",
             profile.dir.display()
-        );
+        ));
         return ExitCode::FAILURE;
     }
     let settings = match Settings::load(&profile.settings_path()) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("paladin: {e} (in {})", profile.settings_path().display());
+            report_fatal(&format!(
+                "paladin: {e} (in {})",
+                profile.settings_path().display()
+            ));
             return ExitCode::FAILURE;
         }
     };
@@ -66,7 +71,7 @@ fn main() -> ExitCode {
         match chrome::location_input_to_url(arg) {
             Some(url) => urls.push(url),
             None => {
-                eprintln!("paladin: not a URL: {arg:?}");
+                report_fatal(&format!("paladin: not a URL: {arg:?}"));
                 return ExitCode::FAILURE;
             }
         }
@@ -99,7 +104,7 @@ fn main() -> ExitCode {
     let event_loop = match builder.build() {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("paladin: cannot create event loop: {e}");
+            report_fatal(&format!("paladin: cannot create event loop: {e}"));
             return ExitCode::FAILURE;
         }
     };
@@ -109,7 +114,7 @@ fn main() -> ExitCode {
         Ok(()) if app.started_cleanly() => ExitCode::SUCCESS,
         Ok(()) => ExitCode::FAILURE,
         Err(e) => {
-            eprintln!("paladin: event loop error: {e}");
+            report_fatal(&format!("paladin: event loop error: {e}"));
             ExitCode::FAILURE
         }
     }

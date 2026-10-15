@@ -24,6 +24,7 @@ use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 
+use crate::fatal::report_fatal;
 use crate::icon;
 use crate::settings_window::{SettingsOutcome, SettingsWindow};
 use crate::window::BrowserWindow;
@@ -137,11 +138,11 @@ impl App {
                         if self.windows.is_empty() {
                             self.window_failed = true;
                         }
-                        eprintln!(
+                        report_fatal(&format!(
                             "paladin: cannot open a window (profile {:?} at {}): {e}",
                             self.browser.profile.name,
                             self.browser.profile.dir.display()
-                        );
+                        ));
                         let actions = dispatch(&mut self.browser, &Command::CloseWindow(window));
                         self.perform_all(actions, event_loop);
                     }
@@ -350,12 +351,12 @@ impl ApplicationHandler<AppEvent> for App {
             match Engine::new(&servo_dir, self.waker.clone()) {
                 Ok(engine) => self.engine = Some(engine),
                 Err(e) => {
-                    eprintln!(
+                    report_fatal(&format!(
                         "paladin: the browser engine failed to start for profile {:?} \
                          (directory {}): {e}",
                         self.browser.profile.name,
                         self.browser.profile.dir.display()
-                    );
+                    ));
                     self.engine_failed = true;
                     self.exiting = true;
                     event_loop.exit();

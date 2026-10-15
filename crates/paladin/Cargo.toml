@@ -35,6 +35,11 @@ objc2-app-kit = { version = "0.3", default-features = false, features = [
 ] }
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSData"] }
 
+[target.'cfg(windows)'.dependencies]
+# Native message box for fatal startup errors in release builds (see fatal.rs).
+# 0.61 is the windows-sys already in Cargo.lock, so no new crate is pulled.
+windows-sys = { version = "0.61", features = ["Win32_UI_WindowsAndMessaging"] }
+
 [target.'cfg(windows)'.build-dependencies]
 winresource = "0.1"
 
