@@ -2,7 +2,8 @@
 //! Pure functions of the model that return the commands the user issued.
 
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
+use std::net::Ipv4Addr;
+use std::sync::Arc;
 
 use egui::{Button, ColorImage, Id, Key, Panel, Rect, TextureHandle, TextureOptions, Ui, Vec2};
 use paladin_core::{Command, Favicon, LoadState, TabId, Window};
@@ -23,7 +24,17 @@ pub struct ChromeState {
     pub focus_address: bool,
     shown_tab: Option<TabId>,
     shown_url: Option<Url>,
-    favicons: HashMap<TabId, (u64, TextureHandle)>,
+    favicons: HashMap<TabId, CachedFavicon>,
+}
+
+/// An uploaded favicon texture. The `Arc` is a clone of the model's pixels:
+/// holding it keeps that allocation alive, so pointer equality with a new
+/// favicon's pixels means the same icon, never a reused address.
+struct CachedFavicon {
+    width: u32,
+    height: u32,
+    rgba: Arc<[u8]>,
+    texture: TextureHandle,
 }
 
 /// Draw the chrome for `window` and return the commands it produced.
@@ -124,7 +135,7 @@ pub fn draw(
                 field.request_focus();
             }
             if field.gained_focus() || focus_requested {
-                select_all(ui, address_id, state.address_text.len());
+                select_all(ui, address_id, state.address_text.chars().count());
             }
             if field.lost_focus()
                 && ui.input(|i| i.key_pressed(Key::Enter))
@@ -186,39 +197,69 @@ pub fn draw_crash_panel(ui: &mut Ui, rect: Rect, reason: &str) -> bool {
     reload
 }
 
-/// Turn address-bar text into a URL. Bare domains get `https://`,
-/// `localhost` and `host:port` get `http://`. Returns `None` for text that
-/// is not a URL (Phase 1 has no search engine).
+/// Turn address-bar text into a URL. Bare domains get `https://`. `localhost`,
+/// bare IPv4 addresses, and `host:port` get `http://`. `javascript:` URLs
+/// are refused. Returns `None` for text that is not a URL (Phase 1 has no
+/// search engine).
 pub fn location_input_to_url(input: &str) -> Option<Url> {
     let text = input.trim();
     if text.is_empty() {
         return None;
     }
     match Url::parse(text) {
+        Ok(url) if url.scheme() == "javascript" => None,
         // "localhost:8080" and "example.com:8080" parse as scheme + path.
         Ok(url)
             if url.host_str().is_none()
                 && (url.scheme() == "localhost" || url.scheme().contains('.')) =>
         {
-            Url::parse(&format!("http://{text}")).ok()
+            with_default_scheme(text)
         }
         Ok(url) => Some(url),
         Err(ParseError::RelativeUrlWithoutBase) if looks_like_host(text) => {
-            let scheme = if text.starts_with("localhost") {
-                "http"
-            } else {
-                "https"
-            };
-            Url::parse(&format!("{scheme}://{text}")).ok()
+            with_default_scheme(text)
         }
         Err(_) => None,
     }
 }
 
+/// `text` with the scheme `default_scheme` picks for it, parsed.
+fn with_default_scheme(text: &str) -> Option<Url> {
+    Url::parse(&format!("{}://{text}", default_scheme(text))).ok()
+}
+
+/// `http` for `localhost`, bare IPv4 addresses, and `host:port`; `https` for
+/// everything else.
+fn default_scheme(text: &str) -> &'static str {
+    let (host, port) = split_port(authority(text));
+    if host == "localhost" || host.parse::<Ipv4Addr>().is_ok() || port.is_some() {
+        "http"
+    } else {
+        "https"
+    }
+}
+
 fn looks_like_host(text: &str) -> bool {
+    let (host, _) = split_port(authority(text));
     !text.contains(char::is_whitespace)
         && !text.starts_with('.')
-        && (text == "localhost" || text.starts_with("localhost:") || text.contains('.'))
+        && (host == "localhost" || host.contains('.'))
+}
+
+/// The part of address-bar text before any path, query, or fragment, such as
+/// `host` or `host:port`.
+fn authority(text: &str) -> &str {
+    text.split(['/', '?', '#']).next().unwrap_or(text)
+}
+
+/// Splits `host:port` when the part after the last colon is all digits.
+fn split_port(authority: &str) -> (&str, Option<&str>) {
+    match authority.rsplit_once(':') {
+        Some((host, port)) if !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()) => {
+            (host, Some(port))
+        }
+        _ => (authority, None),
+    }
 }
 
 fn sync_address_text(state: &mut ChromeState, tab: TabId, url: &Url) {
@@ -249,11 +290,10 @@ fn favicon_texture<'a>(
     favicon: Option<&Favicon>,
 ) -> Option<&'a TextureHandle> {
     let favicon = favicon?;
-    let key = fingerprint(favicon);
     let fresh = state
         .favicons
         .get(&tab)
-        .is_some_and(|(existing, _)| *existing == key);
+        .is_some_and(|cached| cached.is_for(favicon));
     if !fresh {
         let image = ColorImage::from_rgba_unmultiplied(
             [favicon.width as usize, favicon.height as usize],
@@ -262,17 +302,28 @@ fn favicon_texture<'a>(
         let texture =
             ui.ctx()
                 .load_texture(format!("favicon-{}", tab.0), image, TextureOptions::LINEAR);
-        state.favicons.insert(tab, (key, texture));
+        state.favicons.insert(
+            tab,
+            CachedFavicon {
+                width: favicon.width,
+                height: favicon.height,
+                rgba: favicon.rgba.clone(),
+                texture,
+            },
+        );
     }
-    state.favicons.get(&tab).map(|(_, t)| t)
+    state.favicons.get(&tab).map(|cached| &cached.texture)
 }
 
-fn fingerprint(favicon: &Favicon) -> u64 {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    favicon.width.hash(&mut hasher);
-    favicon.height.hash(&mut hasher);
-    favicon.rgba.hash(&mut hasher);
-    hasher.finish()
+impl CachedFavicon {
+    /// True if this texture was uploaded from `favicon`'s pixels. The model
+    /// replaces the `Arc` whenever the engine reports a new icon, so the
+    /// pointer comparison is exact and costs nothing per frame.
+    fn is_for(&self, favicon: &Favicon) -> bool {
+        self.width == favicon.width
+            && self.height == favicon.height
+            && Arc::ptr_eq(&self.rgba, &favicon.rgba)
+    }
 }
 
 fn truncate(text: &str, max_chars: usize) -> String {
@@ -337,6 +388,86 @@ mod tests {
         assert_eq!(location_input_to_url("hello world"), None);
         assert_eq!(location_input_to_url("justaword"), None);
         assert_eq!(location_input_to_url(".hidden"), None);
+    }
+
+    #[test]
+    fn localhost_with_a_path_gets_http() {
+        assert_eq!(
+            location_input_to_url("localhost/path").unwrap().as_str(),
+            "http://localhost/path"
+        );
+        assert_eq!(
+            location_input_to_url("localhost:8080/path?q=1")
+                .unwrap()
+                .as_str(),
+            "http://localhost:8080/path?q=1"
+        );
+    }
+
+    #[test]
+    fn a_domain_that_starts_with_localhost_gets_https() {
+        assert_eq!(
+            location_input_to_url("localhostfoo.com").unwrap().as_str(),
+            "https://localhostfoo.com/"
+        );
+    }
+
+    #[test]
+    fn bare_ipv4_addresses_get_http_with_or_without_port_and_path() {
+        assert_eq!(
+            location_input_to_url("192.168.1.1").unwrap().as_str(),
+            "http://192.168.1.1/"
+        );
+        assert_eq!(
+            location_input_to_url("192.168.1.1:8080").unwrap().as_str(),
+            "http://192.168.1.1:8080/"
+        );
+        assert_eq!(
+            location_input_to_url("10.0.0.1/admin").unwrap().as_str(),
+            "http://10.0.0.1/admin"
+        );
+    }
+
+    #[test]
+    fn javascript_urls_are_refused() {
+        assert_eq!(location_input_to_url("javascript:alert(1)"), None);
+        assert_eq!(location_input_to_url("  JavaScript:void(0) "), None);
+    }
+
+    fn url(text: &str) -> Url {
+        Url::parse(text).unwrap()
+    }
+
+    #[test]
+    fn edited_address_text_survives_an_engine_url_change() {
+        let mut state = ChromeState::default();
+        sync_address_text(&mut state, TabId(1), &url("https://a.test/"));
+        state.address_text = "typed by the user".into();
+        state.address_dirty = true;
+        sync_address_text(&mut state, TabId(1), &url("https://a.test/moved"));
+        assert_eq!(state.address_text, "typed by the user");
+        assert!(state.address_dirty);
+    }
+
+    #[test]
+    fn switching_tabs_resets_edited_text_to_the_new_tab_url() {
+        let mut state = ChromeState::default();
+        sync_address_text(&mut state, TabId(1), &url("https://a.test/"));
+        state.address_text = "typed by the user".into();
+        state.address_dirty = true;
+        sync_address_text(&mut state, TabId(2), &url("https://b.test/"));
+        assert_eq!(state.address_text, "https://b.test/");
+        assert!(!state.address_dirty);
+    }
+
+    #[test]
+    fn clean_address_text_follows_the_url() {
+        let mut state = ChromeState::default();
+        sync_address_text(&mut state, TabId(1), &url("https://a.test/"));
+        assert!(!state.address_dirty);
+        sync_address_text(&mut state, TabId(1), &url("https://a.test/next"));
+        assert_eq!(state.address_text, "https://a.test/next");
+        assert!(!state.address_dirty);
     }
 
     #[test]
