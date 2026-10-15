@@ -117,17 +117,7 @@ pub struct Browser {
     pub windows: Vec<Window>,
     /// Last engine-level error reported by Servo, shown in the status area.
     pub engine_error: Option<String>,
-    // TEMP(phase-2-task-4): remove this attribute when `dispatch` starts using it.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "read by allocate_window_id, used from Task 4")
-    )]
     next_window_id: u64,
-    // TEMP(phase-2-task-4): remove this attribute when `dispatch` starts using it.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "read by allocate_tab_id, used from Task 4")
-    )]
     next_tab_id: u64,
 }
 
@@ -178,16 +168,12 @@ impl Browser {
         Url::parse(&self.settings.homepage).unwrap_or_else(|_| self.new_tab_url())
     }
 
-    // TEMP(phase-2-task-4): remove this attribute when `dispatch` starts using it.
-    #[cfg_attr(not(test), expect(dead_code, reason = "used by dispatch from Task 4"))]
     pub(crate) fn allocate_window_id(&mut self) -> WindowId {
         let id = WindowId(self.next_window_id);
         self.next_window_id += 1;
         id
     }
 
-    // TEMP(phase-2-task-4): remove this attribute when `dispatch` starts using it.
-    #[cfg_attr(not(test), expect(dead_code, reason = "used by dispatch from Task 4"))]
     pub(crate) fn allocate_tab_id(&mut self) -> TabId {
         let id = TabId(self.next_tab_id);
         self.next_tab_id += 1;
