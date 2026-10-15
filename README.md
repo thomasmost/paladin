@@ -107,7 +107,8 @@ or engine glue. Each item must pass.
    without the click reaching the page.
 9. **Shortcuts.** With Cmd on macOS or Ctrl on Windows: T new tab, W close
    tab, Shift+W close window, N new window, L focus the address bar with
-   its text selected, R reload, period stop, Shift+] and Shift+[ next and
+   its text selected, R reload, period Stop (only logs a warning: Servo 0.7.0
+   cannot stop a load), Shift+] and Shift+[ next and
    previous tab (wrapping), comma opens settings, Q quits. Back and forward
    are Cmd+[ and Cmd+] on macOS and Alt+Left and Alt+Right on Windows. A
    chord held down fires once, and none of its key strokes reach the page.
@@ -128,10 +129,14 @@ or engine glue. Each item must pass.
 `cargo install cargo-packager --version 0.11.8 --locked` once, then:
 
 ```bash
-cargo build --release -p paladin
-cargo xtask angle-dlls release   # Windows only
+cargo xtask angle-dlls release   # Windows only, after the build
 cargo packager --release -p paladin
 ```
+
+`cargo packager` runs `cargo build --release -p paladin` first (its
+`before-packaging-command`), so the bundles always match the current source.
+Run the ANGLE DLL step after that build on Windows, because the installer
+picks up the DLLs from `target/release/` when packaging.
 
 Output lands in `target/release/`: `Paladin.app` and `Paladin_<version>_aarch64.dmg`
 on macOS, `paladin_<version>_x64-setup.exe` (NSIS, per-user install) on
@@ -163,6 +168,8 @@ executable.
 - No macOS application menu: winit's default menu is turned off so that
   Cmd+Q reaches Paladin's own shortcut handling, which also removes Cmd+H
   (hide) and Cmd+M (minimize). A custom menu is planned.
+- Restore previous windows on launch is stored in `settings.toml` but not yet
+  acted on.
 - No bookmarks, history UI, downloads UI, extensions, sync, or auto-update.
 - The Windows installer does not bundle the Microsoft Visual C++
   Redistributable that MSVC builds need. Install the x64 redistributable
@@ -175,3 +182,4 @@ executable.
 - [ ] Media playback (the `media-gstreamer` feature is off; no audio or video)
 - [ ] A search engine for address-bar text that is not a URL
 - [ ] IME composition for page text fields: egui-winit disables IME while no chrome field has focus
+- [ ] Restore previous windows on launch (the setting is stored but not acted on)

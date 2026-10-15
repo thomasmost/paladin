@@ -28,7 +28,8 @@ releases yet; `Unreleased` holds everything on `main`.
   Dock icon, `--profile` and URL arguments, and a manual checklist in the
   README.
 - Multiple windows, a settings window that persists the homepage, new-tab
-  URL, and restore option to the profile, keyboard shortcuts for every
+  URL, and a restore option to the profile (the option is stored for a later
+  phase and does not restore windows yet), keyboard shortcuts for every
   command with macOS and Windows defaults, and a window menu.
 - Packaging with cargo-packager: `Paladin.app` and a `.dmg` on macOS, an NSIS
   installer on Windows, built and uploaded by CI.
@@ -54,3 +55,9 @@ releases yet; `Unreleased` holds everything on `main`.
   URL".
 - Windows release builds no longer open a console window next to the app;
   debug builds keep it for logs.
+- Fatal startup errors (an invalid profile name, a profile directory or
+  settings file that cannot be read, a bad URL argument, a failed engine or
+  window start) are shown in a message box in Windows release builds, where
+  stderr is invisible, and still go to stderr everywhere.
+- `cargo packager --release -p paladin` builds the release binary before
+  packaging, so it no longer bundles a stale `target/release/` binary.
