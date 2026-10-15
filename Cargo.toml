@@ -27,3 +27,87 @@ keyboard-types = { version = "0.8.3", features = ["serde"] }
 url = { version = "2.5", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 log = "0.4"
+
+# Servo and stylo build from Paladin's forks so the browser can carry its own
+# patches. The dist branches hold only the files a build needs; the dev
+# branches (paladin/<version>) hold the patch commits. The fork manifests
+# keep the upstream versions, so the exact pins above and in
+# crates/paladin-engine/Cargo.toml still apply. Move all crates of one repo
+# at once with `cargo update -p servo --precise <sha>` or
+# `cargo update -p stylo --precise <sha>`. See CLAUDE.md for the bump and
+# local-loop procedures.
+[patch.crates-io]
+servo = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-allocator = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-background-hang-monitor = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-background-hang-monitor-api = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-base = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-canvas = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-canvas-traits = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-config = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-config-macro = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-constellation = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-constellation-traits = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-default-resources = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-deny-public-fields = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-devtools = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-devtools-traits = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-dom-struct = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-embedder-traits = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-fonts = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-fonts-traits = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-geometry = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-hyper-serde = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-jstraceable-derive = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-layout = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-layout-api = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-malloc-size-of = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-media = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-media-audio = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-media-derive = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-media-dummy = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-media-ohos = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-media-player = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-media-streams = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-media-thread = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-media-traits = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-media-webrtc = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-metrics = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-net = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-net-traits = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-paint = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-paint-api = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-pixels = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-profile = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-profile-traits = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-script = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-script-bindings = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-script-traits = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-script-webgpu = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-storage = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-storage-traits = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-timers = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-tracing = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-url = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-wakelock = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-webgl = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-webgpu = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-webgpu-traits = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-webvtt = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-webxr = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-webxr-api = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+servo-xpath = { git = "https://github.com/thomasmost/servo.git", branch = "dist/paladin-0.7.0" }
+# stylo's style/ crate has path dependencies on selectors, servo_arc, to_shmem
+# and to_shmem_derive, so those must come from the same source or the graph
+# holds two copies of each.
+stylo = { git = "https://github.com/thomasmost/stylo.git", branch = "dist/paladin-0.22.0" }
+stylo_atoms = { git = "https://github.com/thomasmost/stylo.git", branch = "dist/paladin-0.22.0" }
+stylo_derive = { git = "https://github.com/thomasmost/stylo.git", branch = "dist/paladin-0.22.0" }
+stylo_dom = { git = "https://github.com/thomasmost/stylo.git", branch = "dist/paladin-0.22.0" }
+stylo_malloc_size_of = { git = "https://github.com/thomasmost/stylo.git", branch = "dist/paladin-0.22.0" }
+stylo_static_prefs = { git = "https://github.com/thomasmost/stylo.git", branch = "dist/paladin-0.22.0" }
+stylo_traits = { git = "https://github.com/thomasmost/stylo.git", branch = "dist/paladin-0.22.0" }
+selectors = { git = "https://github.com/thomasmost/stylo.git", branch = "dist/paladin-0.22.0" }
+servo_arc = { git = "https://github.com/thomasmost/stylo.git", branch = "dist/paladin-0.22.0" }
+to_shmem = { git = "https://github.com/thomasmost/stylo.git", branch = "dist/paladin-0.22.0" }
+to_shmem_derive = { git = "https://github.com/thomasmost/stylo.git", branch = "dist/paladin-0.22.0" }
