@@ -339,6 +339,47 @@ mod tests {
     }
 
     #[test]
+    fn tab_closed_echo_after_close_tab_command_is_a_no_op() {
+        let (mut b, window, t1) = one_window();
+        dispatch(&mut b, &Command::NewTab { window, url: None });
+        let t2 = b.window(window).unwrap().active;
+        let closed = dispatch(&mut b, &Command::CloseTab(t2));
+        assert_eq!(
+            closed,
+            vec![EngineAction::CloseTab(t2), EngineAction::Show(t1)]
+        );
+        let before = b.windows.clone();
+        assert!(apply(&mut b, &EngineEvent::TabClosed(t2)).is_empty());
+        assert_eq!(b.windows, before);
+    }
+
+    #[test]
+    fn tab_closed_echo_after_closing_last_tab_is_a_no_op() {
+        let (mut b, window, t1) = one_window();
+        let closed = dispatch(&mut b, &Command::CloseTab(t1));
+        assert_eq!(
+            closed,
+            vec![
+                EngineAction::CloseTab(t1),
+                EngineAction::CloseWindow(window),
+                EngineAction::Quit,
+            ]
+        );
+        let before = b.windows.clone();
+        assert!(apply(&mut b, &EngineEvent::TabClosed(t1)).is_empty());
+        assert_eq!(b.windows, before);
+        assert!(b.windows.is_empty());
+    }
+
+    #[test]
+    fn tab_closed_for_unknown_tab_is_a_no_op() {
+        let (mut b, _, _) = one_window();
+        let before = b.windows.clone();
+        assert!(apply(&mut b, &EngineEvent::TabClosed(TabId(99))).is_empty());
+        assert_eq!(b.windows, before);
+    }
+
+    #[test]
     fn events_for_unknown_tabs_are_ignored() {
         let (mut b, _, _) = one_window();
         let before = b.windows.clone();

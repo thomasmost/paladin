@@ -540,6 +540,17 @@ mod tests {
     }
 
     #[test]
+    fn tab_and_window_commands_for_unknown_ids_are_no_ops() {
+        let (mut b, _, _) = one_window();
+        let before = b.windows.clone();
+        assert!(dispatch(&mut b, &Command::CloseTab(TabId(99))).is_empty());
+        assert!(dispatch(&mut b, &Command::ActivateTab(TabId(99))).is_empty());
+        assert!(dispatch(&mut b, &Command::NextTab(WindowId(99))).is_empty());
+        assert!(dispatch(&mut b, &Command::PreviousTab(WindowId(99))).is_empty());
+        assert_eq!(b.windows, before);
+    }
+
+    #[test]
     fn dismiss_engine_error_clears_it() {
         let (mut b, _, _) = one_window();
         b.engine_error = Some("lost backend".to_string());
