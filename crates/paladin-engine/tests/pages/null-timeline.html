@@ -28,8 +28,9 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   // stays there, so the time is not advanced by any timeline.
   if (anim.currentTime !== 0) return fail('currentTime with a null timeline is ' + anim.currentTime);
 
-  // Giving the animation a timeline registers it with the document again, so
-  // its pending play task runs and ready resolves. If it were not registered,
+  // The animation was never registered with the document (it had no timeline
+  // from creation). Giving it one registers it for the first time, so its
+  // pending play task runs and ready resolves. If it were not registered,
   // nothing would run that task: ready would never resolve and the guard at
   // the top of the page would report the failure.
   anim.timeline = document.timeline;
@@ -48,7 +49,9 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   await sleep(300);
   if (running.currentTime !== null) return fail('currentTime moved without a timeline: ' + running.currentTime);
 
-  // Restoring a document timeline resumes the animation from its unresolved time.
+  // The document dropped the animation from its list on a tick while it had no
+  // timeline. Restoring a document timeline keeps the start time, so the
+  // current time resolves again and includes the time spent without a timeline.
   running.timeline = document.timeline;
   const restored = running.currentTime;
   if (restored === null) return fail('currentTime stays null after the timeline is restored');
