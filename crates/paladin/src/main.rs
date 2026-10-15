@@ -5,6 +5,7 @@ mod chrome;
 mod icon;
 mod input;
 mod keyutils;
+mod routing;
 mod window;
 
 use std::process::ExitCode;

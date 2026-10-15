@@ -1,12 +1,10 @@
 //! A browser window: a winit window, the engine's tab host for it, and an
 //! egui context sharing the engine's GL context.
 
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use egui::{LayerId, PaintCallback};
 use egui_glow::{CallbackFn, EguiGlow};
-use keyboard_types::Code;
 use paladin_core::{Browser, Command, WindowId};
 use paladin_engine::{
     BlitRect, Engine, EngineError, EngineInput, GlSurface, PhysicalSize, TabHost,
@@ -19,14 +17,11 @@ use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::Window;
 
 use crate::chrome::{self, ChromeState};
-use crate::{icon, input};
-
-/// Who receives pointer events: the chrome (egui) or the page.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum PointerTarget {
-    Egui,
-    Page,
-}
+use crate::routing::{
+    KeyRouter, KeyTarget, PointerCapture, PointerContext, PointerTarget, content_pixels,
+    route_pointer,
+};
+use crate::{icon, input, keyutils};
 
 pub struct BrowserWindow {
     id: WindowId,
@@ -39,14 +34,11 @@ pub struct BrowserWindow {
     /// True while egui draws the page area itself (the crash panel).
     content_is_egui: bool,
     pointer_in_content: bool,
-    /// Set on a button press, cleared on release: the side that took the
-    /// press gets every pointer event until then, so a drag that crosses
-    /// the toolbar edge still ends where it started.
-    pointer_capture: Option<PointerTarget>,
-    /// Keys whose press went to the page. Only their repeats and releases
-    /// go to the page too, so it never sees half a key stroke, for example
-    /// from a key pressed in another window before focus moved here.
-    page_keys: HashSet<Code>,
+    /// Which side holds the pointer during a drag or click. See
+    /// [`PointerCapture`].
+    capture: PointerCapture,
+    /// Which side each held key went to. See [`KeyRouter`].
+    keys: KeyRouter,
     egui: EguiGlow,
     host: TabHost,
     // Dropped last: the tab host and egui hold GL state tied to it.
@@ -92,8 +84,8 @@ impl BrowserWindow {
             content_top_px: 0.0,
             content_is_egui: false,
             pointer_in_content: false,
-            pointer_capture: None,
-            page_keys: HashSet::new(),
+            capture: PointerCapture::default(),
+            keys: KeyRouter::default(),
             egui,
             host,
             window,
@@ -133,28 +125,20 @@ impl BrowserWindow {
         self.host.surface().expect("headed tab host has a surface")
     }
 
-    /// Who the pointer belongs to right now: a captured side during a
-    /// drag; otherwise egui when the pointer is over the chrome, over an
-    /// interactable egui layer (the error overlay), while a popup is open
-    /// (so a click outside closes it), or while the crash panel replaces
-    /// the page; otherwise the page.
+    /// Who the pointer belongs to right now: the side holding a capture,
+    /// otherwise whatever [`route_pointer`] decides from the position and
+    /// egui's state.
     fn pointer_target(&self) -> PointerTarget {
-        if let Some(captured) = self.pointer_capture {
-            return captured;
-        }
-        let over_chrome = match self.cursor {
-            Some(p) => (p.y as f32) < self.content_top_px,
-            None => true,
+        let ctx = PointerContext {
+            over_chrome: match self.cursor {
+                Some(p) => (p.y as f32) < self.content_top_px,
+                None => true,
+            },
+            content_is_egui: self.content_is_egui,
+            over_egui: self.egui.egui_ctx.is_pointer_over_egui(),
+            popup_open: egui::Popup::is_any_open(&self.egui.egui_ctx),
         };
-        let egui_owns = over_chrome
-            || self.content_is_egui
-            || self.egui.egui_ctx.is_pointer_over_egui()
-            || egui::Popup::is_any_open(&self.egui.egui_ctx);
-        if egui_owns {
-            PointerTarget::Egui
-        } else {
-            PointerTarget::Page
-        }
+        route_pointer(self.capture.captured(), ctx)
     }
 
     /// Cursor position in physical pixels relative to the page area.
@@ -186,10 +170,10 @@ impl BrowserWindow {
             }
             WindowEvent::Focused(focused) => {
                 if !focused {
-                    // Releases of keys held while focus moved away go to
-                    // the other window; do not wait for them here.
-                    self.page_keys.clear();
-                    self.pointer_capture = None;
+                    // Releases of keys and buttons held while focus moved
+                    // away arrive elsewhere; do not wait for them here.
+                    self.keys.clear();
+                    self.capture.clear();
                 }
                 if let Some(tab) = active {
                     self.host.set_focused(tab, *focused);
@@ -223,10 +207,10 @@ impl BrowserWindow {
                 }
             }
             WindowEvent::MouseInput { state, button, .. } => {
-                let target = self.pointer_target();
-                self.pointer_capture = match state {
-                    ElementState::Pressed => Some(target),
-                    ElementState::Released => None,
+                let current = self.pointer_target();
+                let target = match state {
+                    ElementState::Pressed => self.capture.press(*button, current),
+                    ElementState::Released => self.capture.release(*button, current),
                 };
                 if target == PointerTarget::Page {
                     forward_to_egui = false;
@@ -254,32 +238,30 @@ impl BrowserWindow {
                 }
             }
             WindowEvent::KeyboardInput { event: key, .. } => {
-                let key_input = crate::keyutils::key_input_from_winit(key, self.modifiers);
-                let pressed = key.state == ElementState::Pressed;
-                // A release of a key the page is holding goes to the page
-                // whoever has focus now, so it never sees half a stroke.
-                if !pressed && self.page_keys.remove(&key_input.code) {
-                    forward_to_egui = false;
-                    if let Some(tab) = active {
-                        self.host.input(tab, EngineInput::Key(key_input));
+                let key_input = keyutils::key_input_from_winit(key, self.modifiers);
+                let egui_wants_keyboard = self.egui.egui_ctx.egui_wants_keyboard_input();
+                let route = self.keys.route(
+                    key_input.code,
+                    key.state == ElementState::Pressed,
+                    key.repeat,
+                    egui_wants_keyboard,
+                );
+                match route {
+                    Some(KeyTarget::Page) => {
+                        forward_to_egui = false;
+                        if let Some(tab) = active {
+                            self.host.input(tab, EngineInput::Key(key_input));
+                        }
                     }
-                } else if !self.egui.egui_ctx.egui_wants_keyboard_input() {
-                    forward_to_egui = false;
-                    // Releases were handled above; a repeat is delivered
-                    // only while the page holds the key.
-                    let deliver = if !pressed {
-                        false
-                    } else if key.repeat {
-                        self.page_keys.contains(&key_input.code)
-                    } else {
-                        self.page_keys.insert(key_input.code);
-                        true
-                    };
-                    if deliver && let Some(tab) = active {
-                        self.host.input(tab, EngineInput::Key(key_input));
-                    }
+                    Some(KeyTarget::Egui) => {}
+                    None => forward_to_egui = false,
                 }
             }
+            // Phase 1 limitation: egui-winit calls `set_ime_allowed(false)`
+            // whenever no egui text field has focus, so winit sends no Ime
+            // events for page content and this arm is not reached for page
+            // text fields. It stays so composed input reaches the page once
+            // IME is enabled for page fields (see the README Todo list).
             WindowEvent::Ime(ime) if !self.egui.egui_ctx.egui_wants_keyboard_input() => {
                 forward_to_egui = false;
                 if let (Some(tab), Some(input)) = (active, input::ime(ime)) {
@@ -328,12 +310,8 @@ impl BrowserWindow {
         egui.run(window, |ui| {
             commands = chrome::draw(ui, model, engine_error, chrome_state);
             let rect = ui.available_rect_before_wrap();
-            let ppp = ui.pixels_per_point();
-            content_top_px = rect.min.y * ppp;
-            let size = PhysicalSize::new(
-                (rect.width() * ppp).round().max(1.0) as u32,
-                (rect.height() * ppp).round().max(1.0) as u32,
-            );
+            let (top, size) = content_pixels(rect, ui.pixels_per_point());
+            content_top_px = top;
             host.resize_content(active, size);
             match &crashed {
                 Some(reason) => {
