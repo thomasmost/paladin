@@ -179,6 +179,9 @@ impl Keymap {
 
     /// Bind `chord` to `kind`, replacing any previous binding of that chord.
     pub fn bind(&mut self, chord: KeyChord, kind: CommandKind) {
+        // Normalise so a chord built with lock keys or other irrelevant
+        // modifiers is stored in the same form `resolve` matches on.
+        let chord = KeyChord::new(chord.modifiers, chord.code);
         self.bindings.retain(|(c, _)| *c != chord);
         self.bindings.push((chord, kind));
     }
@@ -303,6 +306,48 @@ mod tests {
         k.bind(chord, CommandKind::Reload);
         assert_eq!(k.resolve(chord), Some(CommandKind::Reload));
         assert_eq!(k.bindings().filter(|(c, _)| *c == chord).count(), 1);
+    }
+
+    #[test]
+    fn bind_normalises_irrelevant_modifiers_so_the_chord_resolves() {
+        let mut k = Keymap::default();
+        let noisy = KeyChord {
+            modifiers: Modifiers::META | Modifiers::CAPS_LOCK,
+            code: Code::KeyT,
+        };
+        k.bind(noisy, CommandKind::NewTab);
+        assert_eq!(
+            k.resolve(KeyChord::new(Modifiers::META, Code::KeyT)),
+            Some(CommandKind::NewTab)
+        );
+        assert_eq!(k.resolve(noisy), Some(CommandKind::NewTab));
+        assert_eq!(
+            k.bindings().next(),
+            Some((
+                KeyChord::new(Modifiers::META, Code::KeyT),
+                CommandKind::NewTab
+            ))
+        );
+    }
+
+    #[test]
+    fn bind_replaces_existing_chord_given_irrelevant_modifiers() {
+        let mut k = Keymap::defaults(Platform::MacOs);
+        let noisy = KeyChord {
+            modifiers: Modifiers::META | Modifiers::CAPS_LOCK,
+            code: Code::KeyT,
+        };
+        k.bind(noisy, CommandKind::Reload);
+        assert_eq!(
+            k.resolve(KeyChord::new(Modifiers::META, Code::KeyT)),
+            Some(CommandKind::Reload)
+        );
+        assert_eq!(
+            k.bindings()
+                .filter(|(c, _)| c.code == Code::KeyT && c.modifiers == Modifiers::META)
+                .count(),
+            1
+        );
     }
 
     #[test]
