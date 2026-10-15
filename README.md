@@ -173,6 +173,9 @@ Upstream causes and the features they block are tracked in
 - Textareas sized by their `rows` attribute are shorter than in other
   browsers (Servo uses rows × font size, not rows × line height), so one-row
   fields such as Google's search box cut off descenders.
+- Sites that use the Web Animations API (`element.animate()`), such as
+  bsky.app, throw script errors and may not load (Servo 0.7.0 does not
+  implement it).
 - No search engine: address-bar text that is not a URL is ignored.
 - Stop is disabled while a page loads (Servo 0.7.0 has no API for it).
 - No macOS application menu: winit's default menu is turned off so that

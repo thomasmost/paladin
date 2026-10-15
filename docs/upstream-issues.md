@@ -35,6 +35,8 @@ or starts with the workaround noted in the entry.
     warning): [S3](#s3-mask-image-unsupported).
   - Ellipsis on overflowing titles and labels:
     [S4](#s4-text-overflow-unsupported).
+  - Sites that call `element.animate()` without feature detection
+    (bsky.app): [S13](#s13-web-animations-api-unimplemented).
   - Clean stderr on exit: [S6](#s6-memory-profiler-warnings-on-exit).
   - Quiet `cargo build` on macOS:
     [T1](#t1-__eh_frame-section-too-large-linker-warning-on-macos).
@@ -203,6 +205,33 @@ or starts with the workaround noted in the entry.
 - **Blocks:** in-process profiles, as an alternative route to resolving
   [S7](#s7-no-profile-concept-site-data-is-per-process).
 
+### S13: Web Animations API unimplemented
+
+- **Upstream:** [servo/servo#36950][36950] (open, "Implement
+  WebAnimations"; a contributor has an in-progress branch since 2026-04);
+  [servo/servo#44174][44174] (open) is the bsky.app report.
+- **What it is:** `Element.animate()`, `Animation`, and `KeyframeEffect`
+  sit behind the `dom_web_animations_enabled` pref, which is off by
+  default (servo-config-0.7.0, `prefs.rs`). With it off, `element.animate`
+  is undefined. With it on, the interface is a skeleton:
+  `Animation.webidl` comments out `play()`, `cancel()`, `finish()`,
+  `finished`, `onfinish`, and `currentTime`, and `Element::Animate` skips
+  the step that plays the animation (servo-script-0.7.0,
+  `dom/element/element.rs`). `getAnimations()` is missing too.
+- **Effect:** pages that call `element.animate()` throw `t.animate is not a
+  function`, which Paladin logs as an ERROR from
+  `paladin_engine::delegate`. bsky.app breaks in a critical path; the
+  upstream issues also name airbnb.com and beatleader.com.
+- **Workaround:** none. Turning the pref on only moves the exception to the
+  next missing member and defeats sites that feature-detect `animate` and
+  fall back to CSS. Injecting the web-animations-js polyfill through
+  `UserContentManager` is possible (suggested in #44174) but is feature
+  work for one API.
+- **Blocks:** nothing on the roadmap; a README Known limitations entry.
+- **When it lands:** check whether Servo enables the pref by default; if
+  not, decide whether to set it in `Engine`'s `Preferences`. Load bsky.app
+  and remove the README entry.
+
 ## egui and winit
 
 None yet. The IME item looked like one; see Checked and not upstream.
@@ -256,8 +285,10 @@ it up. None yet.
 [13263]: https://github.com/servo/servo/issues/13263
 [13702]: https://github.com/servo/servo/issues/13702
 [13925]: https://github.com/servo/servo/issues/13925
+[36950]: https://github.com/servo/servo/issues/36950
 [40444]: https://github.com/servo/servo/issues/40444
 [43888]: https://github.com/servo/servo/pull/43888
+[44174]: https://github.com/servo/servo/issues/44174
 [44426]: https://github.com/servo/servo/issues/44426
 [46562]: https://github.com/servo/servo/issues/46562
 [47126]: https://github.com/servo/servo/issues/47126
