@@ -43,13 +43,16 @@ windows-sys = { version = "0.61", features = ["Win32_UI_WindowsAndMessaging"] }
 [target.'cfg(windows)'.build-dependencies]
 winresource = "0.1"
 
-# `cargo packager --release -p paladin`, run from the workspace root. Build
-# first:
-# `cargo build --release -p paladin`, plus `cargo xtask angle-dlls release`
-# on Windows.
+# `cargo packager --release -p paladin`, run from the workspace root. The
+# hook below builds the release binary first, so packaging never bundles a
+# stale one. On Windows, `cargo xtask angle-dlls release` stays a separate
+# step: the DLLs it copies are picked up by the `resources` glob.
 [package.metadata.packager]
 product-name = "Paladin"
 identifier = "org.paladin.software"
+# Runs through `sh -c` on macOS and `cmd /C` on Windows, from the directory
+# cargo-packager was started in (the workspace root).
+before-packaging-command = "cargo build --release -p paladin"
 # cargo-packager resolves these relative paths against this crate's directory.
 icons = ["../../assets/icons/paladin.icns", "../../assets/icons/paladin.ico", "../../assets/icons/paladin-256.png"]
 # No `formats` list: cargo-packager 0.11.8 builds every listed format and
