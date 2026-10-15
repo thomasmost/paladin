@@ -56,20 +56,31 @@ jobs:
         run: echo "LIBCLANG_PATH=$env:LLVM_PATH\bin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       # rust-cache alone, no sccache: the repository's cache budget is 10 GB
-      # and the four target caches (check and package on each runner) take
-      # about 8 GB. sccache added thousands of small entries that pushed the
-      # total over the limit, and GitHub then evicted the target caches,
-      # which are what make a warm run take minutes instead of an hour.
+      # and the four target caches (check and package on each runner) took
+      # about 8 GB when measured on 2026-10-15. sccache added thousands of
+      # small entries that pushed the total over the limit, and GitHub then
+      # evicted the target caches, which are what make a warm run take
+      # minutes instead of an hour.
       #
-      # The environment hash is left out of the key because it covers every
-      # installed toolchain, including the runner image's own stable rustc,
-      # which differs between image versions and forced cold Servo builds on
-      # Windows. The toolchain Paladin builds with is pinned in
-      # rust-toolchain.toml, which the key hashes anyway.
+      # rust-cache's key hashes every installed toolchain. The runner image
+      # ships its own stable rustc, which differs between image versions and
+      # changed the key between consecutive Windows runs, forcing cold Servo
+      # builds. Uninstalling the image's toolchains leaves only the pinned
+      # one in that hash, so the key then changes only with
+      # rust-toolchain.toml, the manifests, and Cargo.lock, which rust-cache
+      # hashes as well.
+      - name: Remove the runner image's preinstalled toolchains
+        shell: bash
+        run: |
+          active=$(rustup show active-toolchain | cut -d' ' -f1)
+          for toolchain in $(rustup toolchain list --quiet); do
+            if [ "$toolchain" != "$active" ]; then
+              rustup toolchain uninstall "$toolchain"
+            fi
+          done
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          add-rust-environment-hash-key: false
 
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
@@ -119,11 +130,20 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: echo "LIBCLANG_PATH=$env:LLVM_PATH\bin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      # Same cache settings as the check job, for the same reasons.
+      # Same toolchain clean-up and cache settings as the check job, for the
+      # same reasons.
+      - name: Remove the runner image's preinstalled toolchains
+        shell: bash
+        run: |
+          active=$(rustup show active-toolchain | cut -d' ' -f1)
+          for toolchain in $(rustup toolchain list --quiet); do
+            if [ "$toolchain" != "$active" ]; then
+              rustup toolchain uninstall "$toolchain"
+            fi
+          done
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          add-rust-environment-hash-key: false
 
       # rust-cache restores ~/.cargo/bin, so this is a no-op after the first run.
       - run: cargo install cargo-packager --version 0.11.8 --locked
