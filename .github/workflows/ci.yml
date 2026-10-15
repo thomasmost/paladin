@@ -20,7 +20,8 @@ jobs:
   check:
     name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    # Servo is a long build; the first run on each runner can exceed an hour.
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
@@ -64,6 +65,13 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo build --workspace --all-targets
+
+      # The engine links libEGL.dll and loads it by name at runtime; the
+      # test binaries need it beside them.
+      - name: Copy ANGLE DLLs next to the binaries (Windows)
+        if: runner.os == 'Windows'
+        run: cargo xtask angle-dlls debug
+
       - run: cargo test --workspace
 
       # tiny-skia's output is not guaranteed identical across CPU
