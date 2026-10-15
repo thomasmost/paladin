@@ -2,8 +2,8 @@
 //! a default, so a file from an older or newer version still loads.
 
 use std::fmt;
-use std::io;
-use std::path::Path;
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -72,14 +72,38 @@ impl Settings {
         }
     }
 
-    /// Write to `path`, creating parent directories as needed.
+    /// Write to `path`, creating parent directories as needed. The text goes
+    /// to a sibling `<path>.tmp` first, is synced to disk, and is then renamed
+    /// over `path`, so a crash mid-write leaves the previous file intact rather
+    /// than a truncated one. The temporary file is removed if any step fails.
     pub fn save(&self, path: &Path) -> Result<(), SettingsError> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        std::fs::write(path, self.to_toml()?)?;
+        let text = self.to_toml()?;
+        let tmp = temp_path(path);
+        let result =
+            write_and_sync(&tmp, text.as_bytes()).and_then(|()| std::fs::rename(&tmp, path));
+        if result.is_err() {
+            let _ = std::fs::remove_file(&tmp);
+        }
+        result?;
         Ok(())
     }
+}
+
+/// The sibling temporary path used while saving: `<path>.tmp`, in the same
+/// directory so the final rename stays on one filesystem.
+fn temp_path(path: &Path) -> PathBuf {
+    let mut name = path.as_os_str().to_owned();
+    name.push(".tmp");
+    PathBuf::from(name)
+}
+
+fn write_and_sync(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let mut file = std::fs::File::create(path)?;
+    file.write_all(bytes)?;
+    file.sync_all()
 }
 
 #[cfg(test)]
@@ -133,5 +157,41 @@ mod tests {
         };
         s.save(&path).unwrap();
         assert_eq!(Settings::load(&path).unwrap(), s);
+    }
+
+    #[test]
+    fn save_replaces_existing_file_and_leaves_no_temp_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        let first = Settings {
+            homepage: "https://first.example/".to_string(),
+            ..Settings::default()
+        };
+        let second = Settings {
+            homepage: "https://second.example/".to_string(),
+            ..Settings::default()
+        };
+        first.save(&path).unwrap();
+        second.save(&path).unwrap();
+        assert_eq!(Settings::load(&path).unwrap(), second);
+        assert!(!temp_path(&path).exists());
+        let names: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect();
+        assert_eq!(names, vec![std::ffi::OsString::from("settings.toml")]);
+    }
+
+    #[test]
+    fn failed_save_leaves_no_temp_file_and_reports_the_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        // Renaming a file over a directory fails on every platform.
+        std::fs::create_dir(&path).unwrap();
+        assert!(matches!(
+            Settings::default().save(&path),
+            Err(SettingsError::Io(_))
+        ));
+        assert!(!temp_path(&path).exists());
     }
 }
