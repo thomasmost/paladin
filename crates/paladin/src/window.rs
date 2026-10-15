@@ -17,9 +17,10 @@ use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::Window;
 
 use crate::chrome::{self, ChromeState};
-use crate::input::{self, KeyRoute};
+use crate::input;
 use crate::routing::{
-    KeyRouter, PointerCapture, PointerContext, PointerTarget, content_pixels, route_pointer,
+    KeyRouter, KeyStroke, KeyTarget, PointerCapture, PointerContext, PointerTarget, content_pixels,
+    route_pointer,
 };
 use crate::{icon, keyutils};
 
@@ -246,28 +247,32 @@ impl BrowserWindow {
             WindowEvent::KeyboardInput { event: key, .. } => {
                 let key_input = keyutils::key_input_from_winit(key, self.modifiers);
                 let egui_wants_keyboard = self.egui.egui_ctx.egui_wants_keyboard_input();
-                let route = self.keys.route(
-                    key_input.code,
-                    key_input.modifiers,
-                    key.state == ElementState::Pressed,
-                    key.repeat,
-                    egui_wants_keyboard,
-                    keymap,
-                );
-                match route {
-                    Some(KeyRoute::Page) => {
+                let stroke = KeyStroke {
+                    code: key_input.code,
+                    modifiers: key_input.modifiers,
+                    pressed: key.state == ElementState::Pressed,
+                    repeat: key.repeat,
+                };
+                let live = |tab| {
+                    browser
+                        .window(self.id)
+                        .is_some_and(|w| w.tab(tab).is_some())
+                };
+                let target = self
+                    .keys
+                    .route(stroke, egui_wants_keyboard, active, live, keymap);
+                match target {
+                    Some(KeyTarget::Page(tab)) => {
                         forward_to_egui = false;
-                        if let Some(tab) = active {
-                            self.host.input(tab, EngineInput::Key(key_input));
-                        }
+                        self.host.input(tab, EngineInput::Key(key_input));
                     }
-                    Some(KeyRoute::Command(kind)) => {
+                    Some(KeyTarget::Command(kind)) => {
                         forward_to_egui = false;
                         if let Some(tab) = active {
                             commands.push(kind.into_command(self.id, tab));
                         }
                     }
-                    Some(KeyRoute::Egui) => {}
+                    Some(KeyTarget::Egui) => {}
                     None => forward_to_egui = false,
                 }
             }

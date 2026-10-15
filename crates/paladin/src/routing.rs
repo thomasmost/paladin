@@ -4,11 +4,11 @@
 //! in physical pixels. The window reads egui
 //! and winit state and feeds it in here, so every rule has a unit test.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use egui::Rect;
 use keyboard_types::{Code, Modifiers};
-use paladin_core::Keymap;
+use paladin_core::{CommandKind, Keymap, TabId};
 use paladin_engine::PhysicalSize;
 use winit::event::MouseButton;
 
@@ -94,12 +94,38 @@ impl PointerCapture {
     }
 }
 
+/// Where a key event goes, as decided by [`KeyRouter::route`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KeyTarget {
+    /// egui gets the key.
+    Egui,
+    /// The key fires a keymap command.
+    Command(CommandKind),
+    /// The page gets the key in this tab: the tab that received its press.
+    Page(TabId),
+}
+
+/// One key event as the window reads it from winit.
+#[derive(Clone, Copy, Debug)]
+pub struct KeyStroke {
+    pub code: Code,
+    pub modifiers: Modifiers,
+    pub pressed: bool,
+    pub repeat: bool,
+}
+
 /// Decides where key events go and remembers which side received each
 /// press, so that side also receives the repeats and the release. The page
 /// never sees half a key stroke (for example a key pressed in another window
 /// before focus moved here, or a chord that fired a command), and egui never
 /// misses the release of a key it saw go down (after Enter submits the
 /// address bar, the field loses focus before the Enter release arrives).
+///
+/// A key the page holds remembers the tab that received its press. Its
+/// repeats and release go to that tab even if another tab became active
+/// meanwhile (Meta pressed in tab A, then Cmd+Shift+] makes B active, then
+/// Meta is released: A gets the release, so A never keeps a key down). If
+/// that tab has closed, the hold is dropped and nothing is delivered.
 ///
 /// The full rule, in order:
 /// 1. A release goes to the side that got the press, whoever has focus now;
@@ -109,54 +135,72 @@ impl PointerCapture {
 ///    press of a bound chord is a command (while egui has focus, only chords
 ///    with Cmd or Ctrl). A command takes its key away from the page, so the
 ///    chord's repeats and release never reach it.
-/// 3. A press or repeat of a key the page holds stays with the page.
+/// 3. A press or repeat of a key the page holds goes to the tab that holds
+///    it, or is dropped if that tab is gone.
 /// 4. egui gets the key while it has focus, or if it got the key's press.
 /// 5. A repeat nobody here saw pressed is dropped.
-/// 6. Otherwise the page gets the press and holds the key until its release.
+/// 6. Otherwise the active tab gets the press and holds the key until its
+///    release.
 #[derive(Debug, Default)]
 pub struct KeyRouter {
-    page_keys: HashSet<Code>,
+    /// Keys the page holds, each with the tab that received its press.
+    page_keys: HashMap<Code, TabId>,
     egui_keys: HashSet<Code>,
 }
 
 impl KeyRouter {
-    /// Route one key event. `None` means nobody sees it.
+    /// Route one key event. `active` is the window's active tab, which gets
+    /// new page presses; `live` says whether a tab still exists. `None`
+    /// means nobody sees the event.
     pub fn route(
         &mut self,
-        code: Code,
-        modifiers: Modifiers,
-        pressed: bool,
-        repeat: bool,
+        stroke: KeyStroke,
         egui_wants_keyboard: bool,
+        active: Option<TabId>,
+        live: impl Fn(TabId) -> bool,
         keymap: &Keymap,
-    ) -> Option<KeyRoute> {
+    ) -> Option<KeyTarget> {
+        let KeyStroke {
+            code,
+            modifiers,
+            pressed,
+            repeat,
+        } = stroke;
         if !pressed {
-            if self.page_keys.remove(&code) {
-                return Some(KeyRoute::Page);
+            if let Some(tab) = self.page_keys.remove(&code) {
+                return live(tab).then_some(KeyTarget::Page(tab));
             }
             if self.egui_keys.remove(&code) {
-                return Some(KeyRoute::Egui);
+                return Some(KeyTarget::Egui);
             }
-            return egui_wants_keyboard.then_some(KeyRoute::Egui);
+            return egui_wants_keyboard.then_some(KeyTarget::Egui);
         }
         let first_cut =
             input::route_key(egui_wants_keyboard, true, repeat, modifiers, code, keymap);
-        if let KeyRoute::Command(_) = first_cut {
+        if let KeyRoute::Command(kind) = first_cut {
             self.page_keys.remove(&code);
-            return Some(first_cut);
+            return Some(KeyTarget::Command(kind));
         }
-        if self.page_keys.contains(&code) {
-            return Some(KeyRoute::Page);
+        if let Some(&tab) = self.page_keys.get(&code) {
+            if live(tab) {
+                return Some(KeyTarget::Page(tab));
+            }
+            // The tab closed while the key was held, so the hold goes too.
+            self.page_keys.remove(&code);
+            if repeat {
+                return None;
+            }
         }
         if first_cut == KeyRoute::Egui || self.egui_keys.contains(&code) {
             self.egui_keys.insert(code);
-            return Some(KeyRoute::Egui);
+            return Some(KeyTarget::Egui);
         }
         if repeat {
             return None;
         }
-        self.page_keys.insert(code);
-        Some(KeyRoute::Page)
+        let tab = active?;
+        self.page_keys.insert(code, tab);
+        Some(KeyTarget::Page(tab))
     }
 
     /// Forget every key, for example when the window loses focus. egui does
@@ -187,10 +231,12 @@ pub fn content_pixels(rect: Rect, pixels_per_point: f32) -> (f32, PhysicalSize<u
 mod tests {
     use super::*;
     use egui::pos2;
-    use paladin_core::{CommandKind, Platform};
+    use paladin_core::Platform;
 
     const LEFT: MouseButton = MouseButton::Left;
     const RIGHT: MouseButton = MouseButton::Right;
+    const TAB_A: TabId = TabId(1);
+    const TAB_B: TabId = TabId(2);
 
     fn ctx() -> PointerContext {
         PointerContext {
@@ -364,38 +410,51 @@ mod tests {
         Keymap::defaults(Platform::MacOs)
     }
 
-    /// An unmodified key event through `keys`.
+    /// Every tab exists.
+    fn all_live(_: TabId) -> bool {
+        true
+    }
+
+    fn stroke(code: Code, modifiers: Modifiers, pressed: bool, repeat: bool) -> KeyStroke {
+        KeyStroke {
+            code,
+            modifiers,
+            pressed,
+            repeat,
+        }
+    }
+
+    /// An unmodified key event through `keys`, with TAB_A active.
     fn plain(
         keys: &mut KeyRouter,
         code: Code,
         pressed: bool,
         repeat: bool,
         egui_wants_keyboard: bool,
-    ) -> Option<KeyRoute> {
+    ) -> Option<KeyTarget> {
         keys.route(
-            code,
-            Modifiers::empty(),
-            pressed,
-            repeat,
+            stroke(code, Modifiers::empty(), pressed, repeat),
             egui_wants_keyboard,
+            Some(TAB_A),
+            all_live,
             &mac(),
         )
     }
 
-    /// A key event with Cmd held, as macOS shortcuts arrive.
+    /// A key event with Cmd held, as macOS shortcuts arrive, with TAB_A
+    /// active.
     fn cmd(
         keys: &mut KeyRouter,
         code: Code,
         pressed: bool,
         repeat: bool,
         egui_wants_keyboard: bool,
-    ) -> Option<KeyRoute> {
+    ) -> Option<KeyTarget> {
         keys.route(
-            code,
-            Modifiers::META,
-            pressed,
-            repeat,
+            stroke(code, Modifiers::META, pressed, repeat),
             egui_wants_keyboard,
+            Some(TAB_A),
+            all_live,
             &mac(),
         )
     }
@@ -405,15 +464,15 @@ mod tests {
         let mut keys = KeyRouter::default();
         assert_eq!(
             plain(&mut keys, Code::KeyA, true, false, false),
-            Some(KeyRoute::Page)
+            Some(KeyTarget::Page(TAB_A))
         );
         assert_eq!(
             plain(&mut keys, Code::KeyA, true, true, false),
-            Some(KeyRoute::Page)
+            Some(KeyTarget::Page(TAB_A))
         );
         assert_eq!(
             plain(&mut keys, Code::KeyA, false, false, false),
-            Some(KeyRoute::Page)
+            Some(KeyTarget::Page(TAB_A))
         );
         // Released: a later release is no longer the page's.
         assert_eq!(plain(&mut keys, Code::KeyA, false, false, false), None);
@@ -424,15 +483,15 @@ mod tests {
         let mut keys = KeyRouter::default();
         assert_eq!(
             plain(&mut keys, Code::KeyA, true, false, true),
-            Some(KeyRoute::Egui)
+            Some(KeyTarget::Egui)
         );
         assert_eq!(
             plain(&mut keys, Code::KeyA, true, true, true),
-            Some(KeyRoute::Egui)
+            Some(KeyTarget::Egui)
         );
         assert_eq!(
             plain(&mut keys, Code::KeyA, false, false, true),
-            Some(KeyRoute::Egui)
+            Some(KeyTarget::Egui)
         );
     }
 
@@ -443,11 +502,11 @@ mod tests {
         let mut keys = KeyRouter::default();
         assert_eq!(
             plain(&mut keys, Code::Enter, true, false, true),
-            Some(KeyRoute::Egui)
+            Some(KeyTarget::Egui)
         );
         assert_eq!(
             plain(&mut keys, Code::Enter, false, false, false),
-            Some(KeyRoute::Egui)
+            Some(KeyTarget::Egui)
         );
         // Nothing left to deliver.
         assert_eq!(plain(&mut keys, Code::Enter, false, false, false), None);
@@ -459,7 +518,7 @@ mod tests {
         plain(&mut keys, Code::Backspace, true, false, true);
         assert_eq!(
             plain(&mut keys, Code::Backspace, true, true, false),
-            Some(KeyRoute::Egui)
+            Some(KeyTarget::Egui)
         );
     }
 
@@ -480,11 +539,104 @@ mod tests {
         // with the page so it never sees half a stroke.
         assert_eq!(
             plain(&mut keys, Code::KeyC, true, true, true),
-            Some(KeyRoute::Page)
+            Some(KeyTarget::Page(TAB_A))
         );
         assert_eq!(
             plain(&mut keys, Code::KeyC, false, false, true),
-            Some(KeyRoute::Page)
+            Some(KeyTarget::Page(TAB_A))
+        );
+    }
+
+    /// Meta pressed in tab A, then Cmd+Shift+] makes B active: the release
+    /// still targets A, the tab that saw the press. B gets no lone keyup.
+    #[test]
+    fn a_held_key_releases_in_the_tab_that_got_its_press() {
+        let mut keys = KeyRouter::default();
+        let meta = Code::MetaLeft;
+        assert_eq!(
+            keys.route(
+                stroke(meta, Modifiers::empty(), true, false),
+                false,
+                Some(TAB_A),
+                all_live,
+                &mac(),
+            ),
+            Some(KeyTarget::Page(TAB_A))
+        );
+        // B is now active; a repeat of the held key still goes to A.
+        assert_eq!(
+            keys.route(
+                stroke(meta, Modifiers::empty(), true, true),
+                false,
+                Some(TAB_B),
+                all_live,
+                &mac(),
+            ),
+            Some(KeyTarget::Page(TAB_A))
+        );
+        assert_eq!(
+            keys.route(
+                stroke(meta, Modifiers::empty(), false, false),
+                false,
+                Some(TAB_B),
+                all_live,
+                &mac(),
+            ),
+            Some(KeyTarget::Page(TAB_A))
+        );
+        // The release ended the hold: nothing more goes anywhere.
+        assert_eq!(
+            keys.route(
+                stroke(meta, Modifiers::empty(), false, false),
+                false,
+                Some(TAB_B),
+                all_live,
+                &mac(),
+            ),
+            None
+        );
+    }
+
+    /// A held key whose tab closed is dropped: its release goes nowhere and
+    /// a fresh press goes to the active tab.
+    #[test]
+    fn a_held_key_is_dropped_when_its_tab_closes() {
+        let mut keys = KeyRouter::default();
+        plain(&mut keys, Code::KeyQ, true, false, false);
+        let tab_a_gone = |tab: TabId| tab != TAB_A;
+        assert_eq!(
+            keys.route(
+                stroke(Code::KeyQ, Modifiers::empty(), false, false),
+                false,
+                Some(TAB_B),
+                tab_a_gone,
+                &mac(),
+            ),
+            None
+        );
+
+        plain(&mut keys, Code::KeyQ, true, false, false);
+        assert_eq!(
+            keys.route(
+                stroke(Code::KeyQ, Modifiers::empty(), true, true),
+                false,
+                Some(TAB_B),
+                tab_a_gone,
+                &mac(),
+            ),
+            None,
+            "a repeat of a key whose tab closed is not delivered"
+        );
+        assert_eq!(
+            keys.route(
+                stroke(Code::KeyQ, Modifiers::empty(), true, false),
+                false,
+                Some(TAB_B),
+                tab_a_gone,
+                &mac(),
+            ),
+            Some(KeyTarget::Page(TAB_B)),
+            "a fresh press goes to the active tab"
         );
     }
 
@@ -505,7 +657,7 @@ mod tests {
         let mut keys = KeyRouter::default();
         assert_eq!(
             cmd(&mut keys, Code::KeyT, true, false, false),
-            Some(KeyRoute::Command(CommandKind::NewTab))
+            Some(KeyTarget::Command(CommandKind::NewTab))
         );
         assert_eq!(cmd(&mut keys, Code::KeyT, true, true, false), None);
         assert_eq!(cmd(&mut keys, Code::KeyT, false, false, false), None);
@@ -520,7 +672,7 @@ mod tests {
         plain(&mut keys, Code::KeyT, true, false, false);
         assert_eq!(
             cmd(&mut keys, Code::KeyT, true, false, false),
-            Some(KeyRoute::Command(CommandKind::NewTab))
+            Some(KeyTarget::Command(CommandKind::NewTab))
         );
         assert_eq!(cmd(&mut keys, Code::KeyT, true, true, false), None);
         assert_eq!(cmd(&mut keys, Code::KeyT, false, false, false), None);
@@ -532,11 +684,11 @@ mod tests {
         let mut keys = KeyRouter::default();
         assert_eq!(
             cmd(&mut keys, Code::KeyT, true, false, true),
-            Some(KeyRoute::Command(CommandKind::NewTab))
+            Some(KeyTarget::Command(CommandKind::NewTab))
         );
         assert_eq!(
             cmd(&mut keys, Code::KeyA, true, false, true),
-            Some(KeyRoute::Egui)
+            Some(KeyTarget::Egui)
         );
     }
 
