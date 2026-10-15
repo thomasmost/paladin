@@ -62,6 +62,12 @@ Run from the repo root:
   checklist in `README.md`.
 - **One `Engine` per process.** Servo's options are process-global, so the
   engine test binary holds a single test function.
+- **The style-thread stack size is a build-time setting.** `.cargo/config.toml`
+  exports `SERVO_STYLE_THREAD_STACK_SIZE_KB=8192` to every cargo invocation
+  run from inside the repo; stylo reads it with `option_env!`, and its 512 KB
+  default overflowed on wikipedia.org. Servo's own builds use the same value.
+  Keep it when bumping Servo, and set it by hand if cargo runs from outside
+  the repo.
 - **Every user action is a `Command`.** New chrome controls and shortcuts add
   a `Command` (and a `CommandKind` if it needs a hotkey), never a direct
   engine call.

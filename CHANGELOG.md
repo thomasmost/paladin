@@ -61,3 +61,6 @@ releases yet; `Unreleased` holds everything on `main`.
   stderr is invisible, and still go to stderr everywhere.
 - `cargo packager --release -p paladin` builds the release binary before
   packaging, so it no longer bundles a stale `target/release/` binary.
+- Servo's style threads get an 8 MiB stack, the size Servo's own builds
+  use, so loading a page such as `wikipedia.org` no longer aborts the whole
+  process with a stack overflow in a style thread.

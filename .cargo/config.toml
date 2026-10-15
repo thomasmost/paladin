@@ -1,2 +1,10 @@
 [alias]
 xtask = "run --package xtask --"
+
+[env]
+# stylo sizes its style-thread stacks at compile time and defaults to 512 KB,
+# which a debug build overflowed on wikipedia.org (the whole process aborts).
+# Servo's own mach sets 8 MiB for every build to match Chromium's recursion
+# depth; it only reserves address space. Applies to cargo build, run, test,
+# and cargo-packager's build.
+SERVO_STYLE_THREAD_STACK_SIZE_KB = "8192"
