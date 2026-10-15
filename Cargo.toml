@@ -1,0 +1,27 @@
+[workspace]
+members = ["crates/paladin-core", "crates/paladin-engine", "crates/paladin", "xtask"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+publish = false
+
+[workspace.dependencies]
+# Pinned to the versions Servo 0.7.0's own shell uses. They share a GL
+# context and raw window handles with Servo, so bump them together with
+# `servo` (see CLAUDE.md).
+winit = "=0.30.13"
+egui = "=0.34.3"
+egui-winit = { version = "=0.34.3", default-features = false }
+egui_glow = { version = "=0.34.3", features = ["winit"] }
+glow = "=0.17.0"
+surfman = "=0.14.0"
+raw-window-handle = "0.6"
+dpi = "0.1"
+euclid = "0.22"
+keyboard-types = { version = "0.8.3", features = ["serde"] }
+url = { version = "2.5", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+log = "0.4"

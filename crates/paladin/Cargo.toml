@@ -1,0 +1,15 @@
+[package]
+name = "paladin"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "Paladin desktop browser"
+
+[[bin]]
+name = "paladin"
+path = "src/main.rs"
+
+[dependencies]
+paladin-core = { path = "../paladin-core" }
+paladin-engine = { path = "../paladin-engine" }
