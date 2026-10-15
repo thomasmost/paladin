@@ -9,7 +9,8 @@ description = "Workspace helper tasks: `cargo xtask icons`"
 [dependencies]
 # default-features = false drops text and system-font support, so the
 # output never depends on fonts installed on the machine. The logo must
-# therefore contain no <text> elements.
-resvg = { version = "0.48.1", default-features = false }
+# therefore contain no <text> elements. raster-images lets the SVG place
+# the PNG artwork it frames.
+resvg = { version = "0.48.1", default-features = false, features = ["raster-images"] }
 icns = "0.5.0"
 ico = "0.6.0"

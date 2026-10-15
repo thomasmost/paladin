@@ -23,9 +23,10 @@ crates/
   paladin-core/    Servo-free model: windows, tabs, commands, keymap, settings, profiles
   paladin-engine/  Servo glue: engine, GL surfaces, tab host, delegate -> events
   paladin/         The binary: winit app, egui chrome, dispatch loop, packaging metadata
-xtask/             `cargo xtask icons` (logo.svg -> icns/ico/png), `cargo xtask angle-dlls`
+xtask/             `cargo xtask icons` (logo -> icns/ico/png), `cargo xtask angle-dlls`
 assets/
-  logo.svg         The knight-on-pegasus mark
+  logo.png         The knight-on-pegasus artwork
+  logo.svg         Frames logo.png in the rounded tile the icons use
   icons/           Generated from logo.svg; committed
 docs/
   design-plans/          Approved designs
@@ -47,8 +48,10 @@ is required.
 2. **Windows only, before running:** `cargo xtask angle-dlls` copies
    `libEGL.dll` and `libGLESv2.dll` next to the executables; without them
    the binary does not start.
-3. **Icons:** edit `assets/logo.svg`, run `cargo xtask icons`, and commit the
-   regenerated files in `assets/icons/`. CI fails if they are stale.
+3. **Icons:** replace `assets/logo.png` (the artwork) or edit
+   `assets/logo.svg` (the tile around it), run `cargo xtask icons`, and
+   commit the regenerated files in `assets/icons/`. CI fails if they are
+   stale.
 
 > The first build downloads a prebuilt SpiderMonkey and compiles the rest of
 > Servo: about 5 minutes on an Apple Silicon Mac, longer on Windows and on CI

@@ -34,6 +34,14 @@ releases yet; `Unreleased` holds everything on `main`.
 - Packaging with cargo-packager: `Paladin.app` and a `.dmg` on macOS, an NSIS
   installer on Windows, built and uploaded by CI.
 
+### Changed
+
+- New logo artwork: the knight-on-pegasus illustration in `assets/logo.png`
+  replaces the hand-drawn vector mark, framed by the same white rounded
+  tile. All icon sizes are regenerated from it; the small ones are
+  area-averaged from the 1024 px render rather than sampled, so they are
+  smoother.
+
 ### Fixed
 
 - Address bar: `localhost/path` and bare IPv4 addresses such as

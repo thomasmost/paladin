@@ -23,7 +23,9 @@ use resvg::usvg;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-const PNG_SIZES: [u32; 7] = [16, 32, 64, 128, 256, 512, 1024];
+/// The size rendered from the SVG; every other size is downsampled from it.
+const LARGEST_SIZE: u32 = 1024;
+const PNG_SIZES: [u32; 7] = [16, 32, 64, 128, 256, 512, LARGEST_SIZE];
 const ICO_SIZES: [u32; 6] = [16, 24, 32, 48, 64, 256];
 /// (pixel size, icns slot): the set Apple's `iconutil` produces for a
 /// standard `.iconset`. The `_2x` slots are the Retina versions.
@@ -69,18 +71,31 @@ fn project_root() -> PathBuf {
 }
 
 fn icons(root: &Path) -> Result<()> {
-    let svg_path = root.join("assets").join("logo.svg");
+    let assets = root.join("assets");
+    let svg_path = assets.join("logo.svg");
     let svg_data =
         std::fs::read(&svg_path).map_err(|e| format!("reading {}: {e}", svg_path.display()))?;
-    let tree = usvg::Tree::from_data(&svg_data, &usvg::Options::default())?;
+    // The SVG references the PNG artwork by a relative path, resolved
+    // against the assets directory rather than the current directory.
+    let options = usvg::Options {
+        resources_dir: Some(assets.clone()),
+        ..usvg::Options::default()
+    };
+    let tree = usvg::Tree::from_data(&svg_data, &options)?;
 
     let out = root.join("assets").join("icons");
     std::fs::create_dir_all(&out)?;
 
+    // Render once at the largest size and box-filter the rest down from it.
+    // The artwork is a raster, and resvg's bicubic sampling cannot average
+    // the dozens of source pixels behind each pixel of a 16 px icon; a box
+    // filter over the 1024 px render can, and every smaller size divides it
+    // exactly.
+    let largest = render(&tree, LARGEST_SIZE)?;
     let mut pngs: BTreeMap<u32, Vec<u8>> = BTreeMap::new();
     for size in PNG_SIZES.iter().chain(ICO_SIZES.iter()).copied() {
         if let std::collections::btree_map::Entry::Vacant(entry) = pngs.entry(size) {
-            entry.insert(render_png(&tree, size)?);
+            entry.insert(downsample(&largest, size)?.encode_png()?);
         }
     }
     for size in PNG_SIZES {
@@ -162,7 +177,7 @@ fn angle_dlls(root: &Path, profile: &str) -> Result<()> {
     Ok(())
 }
 
-fn render_png(tree: &usvg::Tree, size: u32) -> Result<Vec<u8>> {
+fn render(tree: &usvg::Tree, size: u32) -> Result<tiny_skia::Pixmap> {
     let mut pixmap = tiny_skia::Pixmap::new(size, size).ok_or("icon size must be non-zero")?;
     let scale_x = size as f32 / tree.size().width();
     let scale_y = size as f32 / tree.size().height();
@@ -171,5 +186,51 @@ fn render_png(tree: &usvg::Tree, size: u32) -> Result<Vec<u8>> {
         tiny_skia::Transform::from_scale(scale_x, scale_y),
         &mut pixmap.as_mut(),
     );
-    Ok(pixmap.encode_png()?)
+    Ok(pixmap)
+}
+
+/// Shrinks a square pixmap to `size` by area averaging: each output pixel
+/// is the mean of the source pixels under it, weighted by how much of each
+/// source pixel its footprint covers. Sizes that do not divide the source
+/// (24, 48) work the same way. The pixels are premultiplied RGBA, so a
+/// plain weighted mean is correct.
+fn downsample(source: &tiny_skia::Pixmap, size: u32) -> Result<tiny_skia::Pixmap> {
+    let src = source.width() as usize;
+    let n = size as usize;
+    if src == n {
+        return Ok(source.clone());
+    }
+    if src < n {
+        return Err(format!("cannot downsample {src} px to {n} px").into());
+    }
+    let ratio = src as f64 / n as f64;
+    let data = source.data();
+    let mut out = tiny_skia::Pixmap::new(size, size).ok_or("icon size must be non-zero")?;
+    let out_data = out.data_mut();
+    // Overlap of the one-pixel-wide source cell `s` with the span [a, b).
+    let overlap = |s: usize, a: f64, b: f64| (b.min(s as f64 + 1.0) - a.max(s as f64)).max(0.0);
+    for y in 0..n {
+        let (y0, y1) = (y as f64 * ratio, (y + 1) as f64 * ratio);
+        for x in 0..n {
+            let (x0, x1) = (x as f64 * ratio, (x + 1) as f64 * ratio);
+            let mut sum = [0f64; 4];
+            let mut weight = 0f64;
+            for sy in y0.floor() as usize..(y1.ceil() as usize).min(src) {
+                let wy = overlap(sy, y0, y1);
+                for sx in x0.floor() as usize..(x1.ceil() as usize).min(src) {
+                    let w = wy * overlap(sx, x0, x1);
+                    let i = (sy * src + sx) * 4;
+                    for (acc, &value) in sum.iter_mut().zip(&data[i..i + 4]) {
+                        *acc += w * f64::from(value);
+                    }
+                    weight += w;
+                }
+            }
+            let o = (y * n + x) * 4;
+            for (dst, total) in out_data[o..o + 4].iter_mut().zip(sum) {
+                *dst = (total / weight).round() as u8;
+            }
+        }
+    }
+    Ok(out)
 }

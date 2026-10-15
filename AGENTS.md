@@ -15,7 +15,7 @@ Cargo workspace (Rust 1.97.1 pinned in `rust-toolchain.toml`, edition 2024).
 | `crates/paladin-core`   | `paladin-core` — the Servo-free model: `model` (`Browser`/`Window`/`Tab`), `command` (`Command`, `dispatch`, `EngineAction`), `event` (`EngineEvent`, `apply`), `keymap` (`Keymap`, `KeyChord`, `CommandKind`), `settings` (TOML), `profile` (paths). Depends on neither servo, egui, nor winit. |
 | `crates/paladin-engine` | `paladin-engine` — the only crate that imports `servo`. `engine.rs` (`Engine`, one per process), `host.rs` (`GlSurface`, a window's GL context; `TabHost`, the tabs of one window painted offscreen), `input.rs` (`EngineInput`), `delegate.rs` (Servo callbacks → `EngineEvent`). Re-exports `keyboard_types` and `PhysicalSize`. |
 | `crates/paladin`        | `paladin` — the binary: `app.rs` (winit `App`), `window.rs` (`BrowserWindow`, egui chrome over the tab host), `settings_window.rs`, `chrome.rs` (pure chrome drawing that returns `Command`s), `routing.rs` (pure, unit-tested pointer/key routing and page-area geometry), `input.rs` (winit → `EngineInput`, `route_key`), `keyutils.rs` (winit keys → `keyboard-types`, copied from servoshell, MPL-2.0 header must stay), `icon.rs`, and the cargo-packager metadata in its `Cargo.toml`. |
-| `xtask`                 | `cargo xtask icons` (logo → icns/ico/png) and `cargo xtask angle-dlls` (Windows ANGLE DLLs next to the binaries). |
+| `xtask`                 | `cargo xtask icons` (renders `assets/logo.svg`, which frames the `logo.png` artwork, at 1024 px and area-averages the smaller icns/ico/png sizes from it) and `cargo xtask angle-dlls` (Windows ANGLE DLLs next to the binaries). |
 
 Data flow: the chrome and the keymap emit `Command`s; `paladin_core::dispatch`
 updates the model and returns `EngineAction`s, which the app forwards to the
@@ -37,7 +37,8 @@ Run from the repo root:
   the first time: it builds Servo).
 - `cargo clippy --workspace --all-targets -- -D warnings` — lint.
 - `cargo fmt --all` — format; CI runs `cargo fmt --all --check`.
-- `cargo xtask icons` — regenerate `assets/icons/` from `assets/logo.svg`.
+- `cargo xtask icons` — regenerate `assets/icons/` from `assets/logo.svg`
+  and the `assets/logo.png` it frames.
 - `cargo xtask angle-dlls [debug|release]` — Windows: copy `libEGL.dll` and
   `libGLESv2.dll` next to the executables after a build.
 - Packaging (see `README.md`): `cargo build --release -p paladin`, then on
@@ -82,8 +83,10 @@ Run from the repo root:
   (0.11.8 fails on formats the host can't build); the per-host default is
   app+dmg on macOS, NSIS on Windows. The `target/release/*.dll` resources glob
   assumes the default target dir and no `--target`.
-- **Generated icons are committed.** Edit `assets/logo.svg`, run
-  `cargo xtask icons`, commit the result. Never hand-edit `assets/icons/`.
+- **Generated icons are committed.** Replace `assets/logo.png` (the
+  artwork) or edit `assets/logo.svg` (the tile that frames it; no `<text>`,
+  the xtask builds resvg without font support), run `cargo xtask icons`,
+  commit the result. Never hand-edit `assets/icons/`.
 - **Format before every commit:** `cargo fmt --all`. CI fails on formatting
   or clippy warnings.
 - **`AGENTS.md` mirrors this file.** Keep them identical.
