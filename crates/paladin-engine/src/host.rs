@@ -263,6 +263,13 @@ impl TabHost {
         self.with(tab, |w| {
             let current = w.size();
             if current.width as u32 != size.width || current.height as u32 != size.height {
+                // Servo resizes its offscreen target in whichever GL context
+                // is current, and the caller may not have made this window's
+                // context current yet (another window may own it), so do it
+                // here.
+                if let Err(e) = self.content.make_current() {
+                    log::error!("making the content context current: {e:?}");
+                }
                 w.resize(size);
             }
         });
