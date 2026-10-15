@@ -54,6 +54,8 @@ pub struct App {
     waker: Arc<WinitWaker>,
     exiting: bool,
     engine_failed: bool,
+    /// The first window could not be opened, so the app has nothing to show.
+    window_failed: bool,
 }
 
 impl App {
@@ -73,12 +75,14 @@ impl App {
             waker: Arc::new(WinitWaker(Mutex::new(event_loop.create_proxy()))),
             exiting: false,
             engine_failed: false,
+            window_failed: false,
         }
     }
 
-    /// False if the engine could not be started (the app exits at once).
+    /// False if the engine or the first window could not be started. Either
+    /// way the app exits at once, and the process must report failure.
     pub fn started_cleanly(&self) -> bool {
-        !self.engine_failed
+        !self.engine_failed && !self.window_failed
     }
 
     fn window_for_tab(&mut self, tab: TabId) -> Option<&mut BrowserWindow> {
@@ -121,6 +125,9 @@ impl App {
                         // Keep the model honest: the window never existed.
                         // If it was the last one, this quits instead of
                         // waiting forever with nothing on screen.
+                        if self.windows.is_empty() {
+                            self.window_failed = true;
+                        }
                         eprintln!(
                             "paladin: cannot open a window (profile {:?} at {}): {e}",
                             self.browser.profile.name,
@@ -146,22 +153,34 @@ impl App {
                 tab,
                 pending,
             } => {
-                let window_exists = match self.window_for_core_id(window) {
+                let adopted = match self.window_for_core_id(window) {
                     Some(w) => {
-                        if w.host_mut().adopt_tab(pending, tab) {
+                        let adopted = w.host_mut().adopt_tab(pending, tab);
+                        if adopted {
                             w.host().set_focused(tab, true);
-                        } else {
-                            log::warn!("engine had no pending tab {pending:?} to adopt");
                         }
                         w.request_redraw();
-                        true
+                        Some(adopted)
                     }
-                    None => false,
+                    None => None,
                 };
-                if !window_exists && let Some(engine) = self.engine.as_ref() {
+                match adopted {
                     // The opener's window closed meanwhile; let the engine
                     // drop the tab it created.
-                    engine.discard_pending(pending);
+                    None => {
+                        if let Some(engine) = self.engine.as_ref() {
+                            engine.discard_pending(pending);
+                        }
+                    }
+                    Some(true) => {}
+                    Some(false) => {
+                        // apply already added and activated the tab, but the
+                        // engine has no content for it. Close it again, as
+                        // dispatch would, so the model matches the engine.
+                        log::warn!("engine had no pending tab {pending:?} to adopt");
+                        let actions = dispatch(&mut self.browser, &Command::CloseTab(tab));
+                        self.perform_all(actions, event_loop);
+                    }
                 }
             }
             EngineAction::Navigate { tab, url } => {
