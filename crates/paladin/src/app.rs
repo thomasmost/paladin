@@ -1,0 +1,339 @@
+//! The winit application: owns the engine, the browser model, and the
+//! native windows, and runs the dispatch loop.
+//!
+//! One iteration, for every winit event:
+//! 1. The window the event belongs to handles it: chrome events go to egui,
+//!    content events go to the active tab through the engine. This yields
+//!    `Command`s.
+//! 2. `dispatch` turns each `Command` into model changes plus
+//!    `EngineAction`s, which `perform` forwards to the engine or handles.
+//! 3. The engine spins; its `EngineEvent`s are drained into `apply`, whose
+//!    follow-up actions are performed too.
+//! 4. Windows that were touched redraw; the redraw paints the active tab
+//!    offscreen and egui blits it below the toolbar.
+
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+
+use paladin_core::{Browser, Command, EngineAction, EngineEvent, TabId, WindowId, apply, dispatch};
+use paladin_engine::{Engine, Waker};
+use winit::application::ApplicationHandler;
+use winit::event::WindowEvent;
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
+
+use crate::icon;
+use crate::window::BrowserWindow;
+
+/// The only user event: the engine asked us to spin its event loop.
+#[derive(Debug)]
+pub enum AppEvent {
+    Wake,
+}
+
+struct WinitWaker(Mutex<EventLoopProxy<AppEvent>>);
+
+impl Waker for WinitWaker {
+    fn wake(&self) {
+        let proxy = self
+            .0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Err(e) = proxy.send_event(AppEvent::Wake) {
+            log::warn!("failed to wake the event loop: {e}");
+        }
+    }
+}
+
+pub struct App {
+    browser: Browser,
+    // Windows are declared before `engine` so they drop first: every tab
+    // host and GL surface must be gone before the engine shuts down.
+    windows: HashMap<winit::window::WindowId, BrowserWindow>,
+    pending_actions: Vec<EngineAction>,
+    engine: Option<Engine>,
+    waker: Arc<WinitWaker>,
+    exiting: bool,
+    engine_failed: bool,
+}
+
+impl App {
+    /// `initial_actions` are the actions from building the initial model in
+    /// `main` (opening the first window and its tabs). They run once the
+    /// event loop is active and the engine exists.
+    pub fn new(
+        browser: Browser,
+        initial_actions: Vec<EngineAction>,
+        event_loop: &EventLoop<AppEvent>,
+    ) -> App {
+        App {
+            browser,
+            windows: HashMap::new(),
+            pending_actions: initial_actions,
+            engine: None,
+            waker: Arc::new(WinitWaker(Mutex::new(event_loop.create_proxy()))),
+            exiting: false,
+            engine_failed: false,
+        }
+    }
+
+    /// False if the engine could not be started (the app exits at once).
+    pub fn started_cleanly(&self) -> bool {
+        !self.engine_failed
+    }
+
+    fn window_for_tab(&mut self, tab: TabId) -> Option<&mut BrowserWindow> {
+        self.windows.values_mut().find(|w| w.hosts_tab(tab))
+    }
+
+    fn window_for_core_id(&mut self, id: WindowId) -> Option<&mut BrowserWindow> {
+        self.windows.values_mut().find(|w| w.core_id() == id)
+    }
+
+    fn run_commands(&mut self, commands: Vec<Command>, event_loop: &ActiveEventLoop) {
+        for command in commands {
+            let actions = dispatch(&mut self.browser, &command);
+            self.perform_all(actions, event_loop);
+        }
+    }
+
+    fn perform_all(&mut self, actions: Vec<EngineAction>, event_loop: &ActiveEventLoop) {
+        for action in actions {
+            if self.exiting {
+                return;
+            }
+            self.perform(action, event_loop);
+        }
+    }
+
+    fn perform(&mut self, action: EngineAction, event_loop: &ActiveEventLoop) {
+        let Some(engine) = self.engine.as_ref() else {
+            return;
+        };
+        match action {
+            EngineAction::OpenWindow { window, tab, url } => {
+                match BrowserWindow::open(event_loop, engine, window) {
+                    Ok(mut bw) => {
+                        bw.host_mut().create_tab(tab, url);
+                        bw.host().set_focused(tab, true);
+                        self.windows.insert(bw.winit_id(), bw);
+                    }
+                    Err(e) => {
+                        // Keep the model honest: the window never existed.
+                        // If it was the last one, this quits instead of
+                        // waiting forever with nothing on screen.
+                        eprintln!(
+                            "paladin: cannot open a window (profile {:?} at {}): {e}",
+                            self.browser.profile.name,
+                            self.browser.profile.dir.display()
+                        );
+                        let actions = dispatch(&mut self.browser, &Command::CloseWindow(window));
+                        self.perform_all(actions, event_loop);
+                    }
+                }
+            }
+            EngineAction::CloseWindow(window) => {
+                self.windows.retain(|_, w| w.core_id() != window);
+            }
+            EngineAction::CreateTab { window, tab, url } => {
+                if let Some(w) = self.window_for_core_id(window) {
+                    w.host_mut().create_tab(tab, url);
+                    w.host().set_focused(tab, true);
+                    w.request_redraw();
+                }
+            }
+            EngineAction::AdoptTab {
+                window,
+                tab,
+                pending,
+            } => {
+                let window_exists = match self.window_for_core_id(window) {
+                    Some(w) => {
+                        if w.host_mut().adopt_tab(pending, tab) {
+                            w.host().set_focused(tab, true);
+                        } else {
+                            log::warn!("engine had no pending tab {pending:?} to adopt");
+                        }
+                        w.request_redraw();
+                        true
+                    }
+                    None => false,
+                };
+                if !window_exists && let Some(engine) = self.engine.as_ref() {
+                    // The opener's window closed meanwhile; let the engine
+                    // drop the tab it created.
+                    engine.discard_pending(pending);
+                }
+            }
+            EngineAction::Navigate { tab, url } => {
+                if let Some(w) = self.window_for_tab(tab) {
+                    w.host().navigate(tab, url);
+                }
+            }
+            EngineAction::Back(tab) => {
+                if let Some(w) = self.window_for_tab(tab) {
+                    w.host().back(tab);
+                }
+            }
+            EngineAction::Forward(tab) => {
+                if let Some(w) = self.window_for_tab(tab) {
+                    w.host().forward(tab);
+                }
+            }
+            EngineAction::Reload(tab) => {
+                if let Some(w) = self.window_for_tab(tab) {
+                    w.host().reload(tab);
+                }
+            }
+            EngineAction::Stop(tab) => {
+                if let Some(w) = self.window_for_tab(tab) {
+                    w.host().stop(tab);
+                }
+            }
+            EngineAction::Show(tab) => {
+                if let Some(w) = self.window_for_tab(tab) {
+                    w.host().show(tab);
+                    w.host().set_focused(tab, true);
+                    w.request_redraw();
+                }
+            }
+            EngineAction::Hide(tab) => {
+                if let Some(w) = self.window_for_tab(tab) {
+                    w.host().set_focused(tab, false);
+                    w.host().hide(tab);
+                }
+            }
+            EngineAction::CloseTab(tab) => {
+                if let Some(w) = self.window_for_tab(tab) {
+                    w.host_mut().close_tab(tab);
+                    w.request_redraw();
+                }
+            }
+            EngineAction::FocusAddressBar(window) => {
+                if let Some(w) = self.window_for_core_id(window) {
+                    w.focus_address_bar();
+                }
+            }
+            EngineAction::OpenSettings => {
+                log::info!("the settings window arrives in Phase 5");
+            }
+            EngineAction::Quit => {
+                self.exiting = true;
+                self.windows.clear();
+                event_loop.exit();
+            }
+        }
+    }
+
+    /// Spin the engine and fold its events into the model.
+    fn pump(&mut self, event_loop: &ActiveEventLoop) {
+        let Some(engine) = self.engine.as_ref() else {
+            return;
+        };
+        engine.spin();
+        for event in engine.drain_events() {
+            if let Some(tab) = tab_of(&event)
+                && let Some(w) = self.window_for_tab(tab)
+            {
+                w.request_redraw();
+            }
+            if let EngineEvent::EngineError(message) = &event {
+                log::error!("engine error: {message}");
+                for w in self.windows.values() {
+                    w.request_redraw();
+                }
+            }
+            let actions = apply(&mut self.browser, &event);
+            if let EngineEvent::NewTabRequested { pending, .. } = &event
+                && actions.is_empty()
+                && let Some(engine) = self.engine.as_ref()
+            {
+                // The opener tab is gone from the model; nothing will adopt
+                // the new tab, so let the engine drop it.
+                engine.discard_pending(*pending);
+            }
+            self.perform_all(actions, event_loop);
+            if self.exiting {
+                return;
+            }
+        }
+    }
+}
+
+fn tab_of(event: &EngineEvent) -> Option<TabId> {
+    match event {
+        EngineEvent::UrlChanged { tab, .. }
+        | EngineEvent::TitleChanged { tab, .. }
+        | EngineEvent::LoadStateChanged { tab, .. }
+        | EngineEvent::HistoryChanged { tab, .. }
+        | EngineEvent::StatusChanged { tab, .. }
+        | EngineEvent::FaviconChanged { tab, .. }
+        | EngineEvent::TabCrashed { tab, .. }
+        | EngineEvent::FrameReady(tab)
+        | EngineEvent::TabClosed(tab) => Some(*tab),
+        EngineEvent::NewTabRequested { opener, .. } => Some(*opener),
+        EngineEvent::EngineError(_) => None,
+    }
+}
+
+impl ApplicationHandler<AppEvent> for App {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        if self.engine.is_none() && !self.exiting {
+            let servo_dir = self.browser.profile.servo_dir();
+            match Engine::new(&servo_dir, self.waker.clone()) {
+                Ok(engine) => self.engine = Some(engine),
+                Err(e) => {
+                    eprintln!(
+                        "paladin: the browser engine failed to start for profile {:?} \
+                         (directory {}): {e}",
+                        self.browser.profile.name,
+                        self.browser.profile.dir.display()
+                    );
+                    self.engine_failed = true;
+                    self.exiting = true;
+                    event_loop.exit();
+                    return;
+                }
+            }
+            icon::set_dock_icon();
+            let actions = std::mem::take(&mut self.pending_actions);
+            self.perform_all(actions, event_loop);
+        }
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window_id: winit::window::WindowId,
+        event: WindowEvent,
+    ) {
+        if self.exiting {
+            return;
+        }
+        if let Some(window) = self.windows.get_mut(&window_id) {
+            let commands = window.handle_event(&self.browser, &event);
+            self.run_commands(commands, event_loop);
+        }
+        self.pump(event_loop);
+        if !self.exiting {
+            event_loop.set_control_flow(ControlFlow::Wait);
+        }
+    }
+
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
+        match event {
+            AppEvent::Wake => self.pump(event_loop),
+        }
+        if !self.exiting {
+            event_loop.set_control_flow(ControlFlow::Wait);
+        }
+    }
+
+    /// Runs on every exit path, including macOS `terminate:` from the Dock
+    /// menu, which otherwise ends the process without dropping `App`. Tear
+    /// down in dependency order: windows (tab hosts, GL) before the engine.
+    fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
+        self.exiting = true;
+        self.windows.clear();
+        self.engine = None;
+    }
+}
