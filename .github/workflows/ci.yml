@@ -57,7 +57,10 @@ jobs:
 
       # rust-cache alone, no sccache: the repository's cache budget is 10 GB
       # and the four target caches (check and package on each runner) took
-      # about 8 GB when measured on 2026-10-15. sccache added thousands of
+      # about 8 GB when measured on 2026-10-15. With the fork sources the two
+      # check caches measured 2.3 GB (macOS) and 3.4 GB (Windows) on the same
+      # date; package caches were not measured (the package job is skipped on
+      # pull requests). sccache added thousands of
       # small entries that pushed the total over the limit, and GitHub then
       # evicted the target caches, which are what make a warm run take
       # minutes instead of an hour.
