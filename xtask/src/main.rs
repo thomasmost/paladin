@@ -82,15 +82,24 @@ fn icons(root: &Path) -> Result<()> {
         ..usvg::Options::default()
     };
     let tree = usvg::Tree::from_data(&svg_data, &options)?;
+    // usvg drops an <image> whose file is missing or unreadable with only a
+    // log warning, which would leave an empty tile in every icon.
+    if !contains_image(tree.root()) {
+        return Err(format!(
+            "{} has no loaded <image>: check that assets/logo.png exists and is a PNG",
+            svg_path.display()
+        )
+        .into());
+    }
 
     let out = root.join("assets").join("icons");
     std::fs::create_dir_all(&out)?;
 
-    // Render once at the largest size and box-filter the rest down from it.
-    // The artwork is a raster, and resvg's bicubic sampling cannot average
-    // the dozens of source pixels behind each pixel of a 16 px icon; a box
-    // filter over the 1024 px render can, and every smaller size divides it
-    // exactly.
+    // Render once at the largest size and area-average the rest down from
+    // it. The artwork is a raster, and resvg's bicubic sampling cannot
+    // average the dozens of source pixels behind each pixel of a 16 px icon;
+    // area averaging over the 1024 px render can. Sizes that do not divide
+    // 1024 (24, 48) weight the partly covered source pixels.
     let largest = render(&tree, LARGEST_SIZE)?;
     let mut pngs: BTreeMap<u32, Vec<u8>> = BTreeMap::new();
     for size in PNG_SIZES.iter().chain(ICO_SIZES.iter()).copied() {
@@ -195,6 +204,14 @@ fn render(tree: &usvg::Tree, size: u32) -> Result<tiny_skia::Pixmap> {
 /// (24, 48) work the same way. The pixels are premultiplied RGBA, so a
 /// plain weighted mean is correct.
 fn downsample(source: &tiny_skia::Pixmap, size: u32) -> Result<tiny_skia::Pixmap> {
+    if source.width() != source.height() {
+        return Err(format!(
+            "downsample needs a square source, got {}x{}",
+            source.width(),
+            source.height()
+        )
+        .into());
+    }
     let src = source.width() as usize;
     let n = size as usize;
     if src == n {
@@ -233,4 +250,112 @@ fn downsample(source: &tiny_skia::Pixmap, size: u32) -> Result<tiny_skia::Pixmap
         }
     }
     Ok(out)
+}
+
+/// Whether the group or any group below it holds a loaded `<image>`.
+fn contains_image(group: &usvg::Group) -> bool {
+    group.children().iter().any(|node| match node {
+        usvg::Node::Image(_) => true,
+        usvg::Node::Group(child) => contains_image(child),
+        _ => false,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn filled(size: u32, rgba: [u8; 4]) -> tiny_skia::Pixmap {
+        let mut pixmap = tiny_skia::Pixmap::new(size, size).unwrap();
+        for px in pixmap.data_mut().chunks_exact_mut(4) {
+            px.copy_from_slice(&rgba);
+        }
+        pixmap
+    }
+
+    #[test]
+    fn uniform_source_stays_uniform_at_a_size_that_does_not_divide_it() {
+        let source = filled(1024, [200, 100, 50, 255]);
+        let out = downsample(&source, 48).unwrap();
+        assert_eq!((out.width(), out.height()), (48, 48));
+        assert!(
+            out.data()
+                .chunks_exact(4)
+                .all(|px| px == [200, 100, 50, 255])
+        );
+    }
+
+    #[test]
+    fn checkerboard_averages_to_the_mean() {
+        // 4x4 checkerboard of opaque black and white, premultiplied.
+        let mut source = tiny_skia::Pixmap::new(4, 4).unwrap();
+        for (i, px) in source.data_mut().chunks_exact_mut(4).enumerate() {
+            let (x, y) = (i % 4, i / 4);
+            let v = if (x + y) % 2 == 0 { 0 } else { 255 };
+            px.copy_from_slice(&[v, v, v, 255]);
+        }
+        for size in [2, 1] {
+            let out = downsample(&source, size).unwrap();
+            // Each output pixel covers an equal number of black and white
+            // pixels, so the mean is 127.5, rounded to 128.
+            assert!(
+                out.data()
+                    .chunks_exact(4)
+                    .all(|px| px == [128, 128, 128, 255]),
+                "size {size}: {:?}",
+                out.data()
+            );
+        }
+    }
+
+    #[test]
+    fn two_by_two_to_one_weights_premultiplied_alpha() {
+        // Three transparent pixels and one opaque red: a quarter of the
+        // coverage, so premultiplied red 64 (255 / 4 rounded) and alpha 64.
+        let mut source = tiny_skia::Pixmap::new(2, 2).unwrap();
+        source.data_mut()[0..4].copy_from_slice(&[255, 0, 0, 255]);
+        let out = downsample(&source, 1).unwrap();
+        assert_eq!(out.data(), [64, 0, 0, 64]);
+    }
+
+    #[test]
+    fn same_size_is_a_copy_and_upsampling_is_an_error() {
+        let source = filled(8, [1, 2, 3, 4]);
+        assert_eq!(downsample(&source, 8).unwrap().data(), source.data());
+        assert!(downsample(&source, 16).is_err());
+        let wide = tiny_skia::Pixmap::new(8, 4).unwrap();
+        assert!(downsample(&wide, 2).is_err());
+    }
+
+    #[test]
+    fn contains_image_sees_a_loaded_image_and_not_a_missing_one() {
+        let dir = std::env::temp_dir().join(format!("paladin-xtask-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("art.png"),
+            filled(2, [0, 0, 0, 255]).encode_png().unwrap(),
+        )
+        .unwrap();
+        let options = usvg::Options {
+            resources_dir: Some(dir.clone()),
+            ..usvg::Options::default()
+        };
+        let svg = |href: &str| {
+            format!(
+                "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'>\
+                 <g><image href='{href}' width='4' height='4'/></g></svg>"
+            )
+        };
+        let loaded = usvg::Tree::from_str(&svg("art.png"), &options).unwrap();
+        assert!(contains_image(loaded.root()));
+        let missing = usvg::Tree::from_str(&svg("missing.png"), &options).unwrap();
+        assert!(!contains_image(missing.root()));
+        let no_image = usvg::Tree::from_str(
+            "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4'/></svg>",
+            &options,
+        )
+        .unwrap();
+        assert!(!contains_image(no_image.root()));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 }
