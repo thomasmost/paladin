@@ -8,3 +8,27 @@ description = "Servo glue: the only crate that imports the servo crate"
 
 [dependencies]
 paladin-core = { path = "../paladin-core" }
+dpi = { workspace = true }
+euclid = { workspace = true }
+glow = { workspace = true }
+keyboard-types = { workspace = true }
+log = { workspace = true }
+raw-window-handle = { workspace = true }
+# Servo's networking needs a process-wide rustls crypto provider; the engine
+# installs it. aws-lc-rs is what Servo's own shell uses.
+rustls = { version = "0.23", default-features = false, features = ["aws-lc-rs"] }
+servo = { version = "=0.7.0", default-features = false, features = [
+    "baked-in-resources",
+    "default_web_features",
+    "js_jit",
+    "multiprocess",
+] }
+url = { workspace = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# ANGLE's EGL instead of WGL, as Servo's shell does. Produces libEGL.dll and
+# libGLESv2.dll, which `cargo xtask angle-dlls` copies next to the binaries.
+servo = { version = "=0.7.0", default-features = false, features = ["no-wgl"] }
+
+[dev-dependencies]
+tempfile = "3"
