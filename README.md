@@ -5,10 +5,6 @@ through Servo, the experimental Rust browser engine; the window chrome (tab
 strip, address bar, settings) is drawn with egui. There is no HTML in the
 chrome.
 
-> Phase 1 is in progress. This README describes the finished Phase 1; the
-> browser window arrives in Phase 4 of the implementation plan, and until
-> then `cargo run` only prints the version.
-
 ## Stack
 
 | Layer     | Choice                                                            |
@@ -69,6 +65,41 @@ macOS and `%APPDATA%\Paladin\profiles\<name>\` on Windows, holding
   window and loads a page (slow the first time).
 - `cargo clippy --workspace --all-targets -- -D warnings` and
   `cargo fmt --all --check` — what CI runs.
+
+## Manual checklist
+
+Run on macOS with `cargo run` after any change to the chrome, input handling,
+or engine glue. Each item must pass.
+
+1. **Launch.** A window titled Paladin opens with one tab at the homepage,
+   the page renders, and the Dock (macOS) or title bar (Windows) shows the
+   Paladin logo.
+2. **Address bar.** Type `example.com` and press Enter: the page loads, the
+   tab title becomes "Example Domain", and the address bar shows
+   `https://example.com/`. Typing `localhost:8080` targets `http://`.
+3. **History.** Navigate to a second page, then use Back and Forward: the
+   buttons enable and disable with the history and the pages change. Reload
+   is always present and reloads the current page; while a page loads, a
+   disabled Stop button appears beside it whose tooltip explains that Servo
+   cannot stop a load.
+4. **Tabs.** "+" opens a new tab and activates it; clicking a tab title
+   switches tabs and the address bar follows; "×" and middle-click close a
+   tab and the neighbour to the right becomes active; closing the last tab
+   closes the window and the process exits.
+5. **Resize and HiDPI.** Resize the window: the page stays aligned under the
+   toolbar with no gap or stretching. Drag the window to a display with a
+   different scale factor (or change the display scaling): text stays sharp
+   and clicks land where expected.
+6. **Input.** Scrolling with the wheel or trackpad over the page scrolls it;
+   clicking a text field on a page and typing enters text; typing in the
+   address bar does not reach the page. Hovering a link shows its URL in the
+   status overlay at the bottom left without the page moving. Drag-select
+   text in the page, release the button over the toolbar, then move the
+   pointer back over the page: the selection does not keep growing. Press
+   in the address bar, release over the page, then move over the page: the
+   address bar's selection does not keep growing either.
+7. **Exit.** Closing the window exits with no Servo error output on the
+   terminal. Quitting from the Dock menu does the same.
 
 ## Todo
 

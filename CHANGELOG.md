@@ -22,3 +22,8 @@ releases yet; `Unreleased` holds everything on `main`.
   per window, a tab host that paints tabs offscreen, a headless test that
   loads a page without a window, and popups opened by `window.open` that keep
   their back and forward state and favicon when adopted.
+- A browser window: tab strip with favicons, toolbar with back, forward,
+  reload, and an address bar, Servo content rendered under the toolbar, a
+  status overlay for link targets and engine errors, the logo as window and
+  Dock icon, `--profile` and URL arguments, and a manual checklist in the
+  README.
