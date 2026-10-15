@@ -66,9 +66,10 @@ jobs:
       # ships its own stable rustc, which differs between image versions and
       # changed the key between consecutive Windows runs, forcing cold Servo
       # builds. Uninstalling the image's toolchains leaves only the pinned
-      # one in that hash, so the key then changes only with
-      # rust-toolchain.toml, the manifests, and Cargo.lock, which rust-cache
-      # hashes as well.
+      # one in that hash, so the key then changes only with the pinned
+      # toolchain, rust-toolchain.toml, .cargo/config.toml, the manifests,
+      # Cargo.lock, and the CARGO*, RUST*, CC*, CXX*, CFLAGS* and CMAKE*
+      # environment variables.
       - name: Remove the runner image's preinstalled toolchains
         shell: bash
         run: |
