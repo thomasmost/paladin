@@ -14,7 +14,7 @@ Cargo workspace (Rust 1.97.1 pinned in `rust-toolchain.toml`, edition 2024).
 | ----------------------- | ---------- |
 | `crates/paladin-core`   | `paladin-core` — the Servo-free model: `Browser`/`Window`/`Tab`, `Command` and `dispatch`, `EngineEvent` and `apply`, `Keymap`, `Settings` (TOML), `Profile` paths. Depends on neither servo, egui, nor winit. |
 | `crates/paladin-engine` | `paladin-engine` — the only crate that imports `servo`. `Engine` (one per process), `GlSurface` (a window's GL context), `TabHost` (the tabs of one window, painted offscreen), `DelegateState` (Servo callbacks → `EngineEvent`). |
-| `crates/paladin`        | `paladin` — the binary: winit `App`, `BrowserWindow` (egui chrome over the tab host), `SettingsWindow`, winit-to-engine input mapping, icons, cargo-packager metadata. |
+| `crates/paladin`        | `paladin` — the binary: winit `App`, `BrowserWindow` (egui chrome over the tab host), `SettingsWindow`, winit-to-engine input mapping, `routing.rs` (pure, unit-tested pointer/key routing and page-area geometry), `chrome.rs` (pure chrome drawing that returns `Command`s), icons, cargo-packager metadata. |
 | `xtask`                 | `cargo xtask icons` (logo → icns/ico/png) and `cargo xtask angle-dlls` (Windows ANGLE DLLs next to the binaries). |
 
 Data flow: the chrome and the keymap emit `Command`s; `paladin_core::dispatch`
@@ -38,8 +38,11 @@ Run from the repo root:
 - `cargo xtask icons` — regenerate `assets/icons/` from `assets/logo.svg`.
 - `cargo xtask angle-dlls [debug|release]` — Windows: copy `libEGL.dll` and
   `libGLESv2.dll` next to the executables after a build.
-- `cargo build --release && cargo packager --release -p paladin` — build the
-  `.app`/`.dmg` (macOS) or NSIS installer (Windows) into `target/release/`.
+- Packaging (see `README.md`): `cargo build --release -p paladin`, then
+  `cargo xtask angle-dlls release` (Windows only; the installer's DLL resources
+  come from this step), then `cargo packager --release -p paladin`, which
+  produces the `.app`/`.dmg` (macOS) or NSIS installer (Windows) in
+  `target/release/`.
 
 ## Conventions
 

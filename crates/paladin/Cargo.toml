@@ -52,7 +52,9 @@ icons = ["../../assets/icons/paladin.icns", "../../assets/icons/paladin.ico", ".
 # instead (app and dmg on macOS, nsis on Windows).
 # Windows: the ANGLE DLLs that `cargo xtask angle-dlls release` copied next
 # to the binary, installed beside paladin.exe. The glob matches nothing on
-# macOS.
+# macOS. It assumes the default target directory and no `--target` flag: with
+# `CARGO_TARGET_DIR` or `--target <triple>` the glob matches nothing and the
+# installer silently ships without the DLLs.
 resources = ["../../target/release/*.dll"]
 
 [package.metadata.packager.macos]

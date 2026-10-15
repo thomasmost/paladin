@@ -137,7 +137,8 @@ Output lands in `target/release/`: `Paladin.app` and `Paladin_<version>_aarch64.
 on macOS, `paladin_<version>_x64-setup.exe` (NSIS, per-user install) on
 Windows. The bundles are unsigned. CI builds both on every push to `main` and
 uploads them as workflow artifacts named `paladin-macos-15` and
-`paladin-windows-2025`.
+`paladin-windows-2025`. Release builds on Windows are GUI-subsystem apps with
+no console window, so they print no logs; debug builds keep the console.
 
 ### Windows prerequisites
 
@@ -163,6 +164,10 @@ executable.
   Cmd+Q reaches Paladin's own shortcut handling, which also removes Cmd+H
   (hide) and Cmd+M (minimize). A custom menu is planned.
 - No bookmarks, history UI, downloads UI, extensions, sync, or auto-update.
+- The Windows installer does not bundle the Microsoft Visual C++
+  Redistributable that MSVC builds need. Install the x64 redistributable
+  first from https://aka.ms/vs/17/release/vc_redist.x64.exe, or the app may
+  fail to start with a missing `vcruntime140.dll` error.
 
 ## Todo
 
