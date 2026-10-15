@@ -12,9 +12,11 @@ use winit::keyboard::ModifiersState;
 use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::Window;
 
+use crate::chrome::{self, location_input_to_url};
 use crate::icon;
 use crate::input::{self, KeyRoute};
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum SettingsOutcome {
     Nothing,
     /// An edited field was committed (focus left it, or a checkbox
@@ -104,7 +106,13 @@ impl SettingsWindow {
     ) -> SettingsOutcome {
         match event {
             WindowEvent::CloseRequested => {
-                return SettingsOutcome::Close { save: self.dirty };
+                // The fields may still hold a typed value that never lost
+                // focus; store its normalised form before the caller saves.
+                if self.dirty {
+                    normalise_url_setting(&mut settings.homepage);
+                    normalise_url_setting(&mut settings.new_tab_url);
+                }
+                return on_close(self.dirty);
             }
             WindowEvent::Resized(size) => {
                 self.surface
@@ -113,15 +121,9 @@ impl SettingsWindow {
             }
             WindowEvent::RedrawRequested => {
                 let activity = self.frame(settings);
-                if activity.edited {
-                    self.dirty = true;
-                }
-                return if activity.committed && self.dirty {
-                    self.dirty = false;
-                    SettingsOutcome::Changed
-                } else {
-                    SettingsOutcome::Nothing
-                };
+                let (dirty, outcome) = after_frame(self.dirty, activity);
+                self.dirty = dirty;
+                return outcome;
             }
             WindowEvent::ModifiersChanged(modifiers) => {
                 self.modifiers = modifiers.state();
@@ -155,6 +157,13 @@ impl SettingsWindow {
             activity = draw_settings(ui, settings);
         });
         self.surface.begin_frame();
+        // egui_glow paints over whatever the framebuffer holds, so clear it
+        // first; the form's panel fills the rest with the same colour.
+        let size = self.window.inner_size();
+        self.egui.painter.clear(
+            [size.width, size.height],
+            chrome::background(&self.egui.egui_ctx),
+        );
         self.egui.paint(&self.window);
         self.surface.present();
         if self.egui.egui_ctx.has_requested_repaint() {
@@ -171,45 +180,212 @@ impl Drop for SettingsWindow {
     }
 }
 
-/// The settings form.
+/// The save rule after one frame of the form. An edit marks the form dirty;
+/// a committed field (or toggled checkbox) while dirty is a change that the
+/// caller persists, which clears the dirty flag. Returns the new dirty flag
+/// and what the window reports.
+fn after_frame(dirty: bool, activity: FormActivity) -> (bool, SettingsOutcome) {
+    let dirty = dirty || activity.edited;
+    if activity.committed && dirty {
+        (false, SettingsOutcome::Changed)
+    } else {
+        (dirty, SettingsOutcome::Nothing)
+    }
+}
+
+/// Closing reports the uncommitted edit, if any, so the caller saves it.
+fn on_close(dirty: bool) -> SettingsOutcome {
+    SettingsOutcome::Close { save: dirty }
+}
+
+/// Stores a URL setting in normalised form when its text parses, so
+/// `example.com` becomes `https://example.com/`. Text that does not parse is
+/// left as typed. Returns true if the stored text changed.
+fn normalise_url_setting(text: &mut String) -> bool {
+    let Some(url) = location_input_to_url(text.as_str()) else {
+        return false;
+    };
+    if url.as_str() == text.as_str() {
+        return false;
+    }
+    *text = url.to_string();
+    true
+}
+
+/// A note under a URL field whose text does not parse. It shows once the
+/// field is not being edited, so it does not flicker while typing.
+fn url_hint(ui: &mut egui::Ui, text: &str, focused: bool) {
+    if !focused && location_input_to_url(text).is_none() {
+        let color = ui.visuals().error_fg_color;
+        ui.label(egui::RichText::new("Not a URL").small().color(color));
+    }
+}
+
+/// The settings form, on the panel fill so the window background is never
+/// left to the framebuffer.
 fn draw_settings(ui: &mut egui::Ui, settings: &mut Settings) -> FormActivity {
     let mut activity = FormActivity::default();
-    ui.heading("Settings");
-    ui.add_space(8.0);
-    egui::Grid::new("settings-grid")
-        .num_columns(2)
-        .spacing([12.0, 8.0])
-        .show(ui, |ui| {
-            ui.label("Homepage");
-            let homepage =
-                ui.add(egui::TextEdit::singleline(&mut settings.homepage).desired_width(300.0));
-            activity.edited |= homepage.changed();
-            activity.committed |= homepage.lost_focus();
-            ui.end_row();
+    egui::CentralPanel::default().show_inside(ui, |ui| {
+        ui.heading("Settings");
+        ui.add_space(8.0);
+        egui::Grid::new("settings-grid")
+            .num_columns(2)
+            .spacing([12.0, 8.0])
+            .show(ui, |ui| {
+                ui.label("Homepage");
+                ui.vertical(|ui| {
+                    let homepage = ui.add(
+                        egui::TextEdit::singleline(&mut settings.homepage).desired_width(300.0),
+                    );
+                    activity.edited |= homepage.changed();
+                    if homepage.lost_focus() {
+                        activity.committed = true;
+                        activity.edited |= normalise_url_setting(&mut settings.homepage);
+                    }
+                    url_hint(ui, &settings.homepage, homepage.has_focus());
+                });
+                ui.end_row();
 
-            ui.label("New tab URL");
-            let new_tab =
-                ui.add(egui::TextEdit::singleline(&mut settings.new_tab_url).desired_width(300.0));
-            activity.edited |= new_tab.changed();
-            activity.committed |= new_tab.lost_focus();
-            ui.end_row();
+                ui.label("New tab URL");
+                ui.vertical(|ui| {
+                    let new_tab = ui.add(
+                        egui::TextEdit::singleline(&mut settings.new_tab_url).desired_width(300.0),
+                    );
+                    activity.edited |= new_tab.changed();
+                    if new_tab.lost_focus() {
+                        activity.committed = true;
+                        activity.edited |= normalise_url_setting(&mut settings.new_tab_url);
+                    }
+                    url_hint(ui, &settings.new_tab_url, new_tab.has_focus());
+                });
+                ui.end_row();
 
-            ui.label("On launch");
-            let restore = ui.checkbox(
-                &mut settings.restore_windows_on_launch,
-                "Restore previous windows (not yet implemented)",
-            );
-            if restore.changed() {
-                activity.edited = true;
-                activity.committed = true;
-            }
-            ui.end_row();
-        });
-    ui.add_space(12.0);
-    ui.label(
-        egui::RichText::new("Keyboard shortcuts and profiles arrive in Phase 2.")
-            .small()
-            .weak(),
-    );
+                ui.label("On launch");
+                let restore = ui.checkbox(
+                    &mut settings.restore_windows_on_launch,
+                    "Restore previous windows (not yet implemented)",
+                );
+                if restore.changed() {
+                    activity.edited = true;
+                    activity.committed = true;
+                }
+                ui.end_row();
+            });
+        ui.add_space(12.0);
+        ui.label(
+            egui::RichText::new("Keyboard shortcuts and profiles arrive in Phase 2.")
+                .small()
+                .weak(),
+        );
+    });
     activity
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn edited() -> FormActivity {
+        FormActivity {
+            edited: true,
+            ..Default::default()
+        }
+    }
+
+    fn committed() -> FormActivity {
+        FormActivity {
+            committed: true,
+            ..Default::default()
+        }
+    }
+
+    fn toggled() -> FormActivity {
+        FormActivity {
+            edited: true,
+            committed: true,
+        }
+    }
+
+    #[test]
+    fn an_edit_without_a_blur_marks_dirty_and_reports_nothing() {
+        assert_eq!(
+            after_frame(false, edited()),
+            (true, SettingsOutcome::Nothing)
+        );
+    }
+
+    #[test]
+    fn a_blur_without_an_edit_reports_nothing() {
+        assert_eq!(
+            after_frame(false, committed()),
+            (false, SettingsOutcome::Nothing)
+        );
+    }
+
+    #[test]
+    fn a_toggle_reports_a_change_at_once() {
+        assert_eq!(
+            after_frame(false, toggled()),
+            (false, SettingsOutcome::Changed)
+        );
+    }
+
+    #[test]
+    fn an_edit_then_a_blur_reports_a_change_and_clears_dirty() {
+        let (dirty, outcome) = after_frame(false, edited());
+        assert_eq!(outcome, SettingsOutcome::Nothing);
+        assert_eq!(
+            after_frame(dirty, committed()),
+            (false, SettingsOutcome::Changed)
+        );
+    }
+
+    #[test]
+    fn an_edit_then_a_close_saves() {
+        let (dirty, _) = after_frame(false, edited());
+        assert_eq!(on_close(dirty), SettingsOutcome::Close { save: true });
+    }
+
+    #[test]
+    fn a_close_while_clean_does_not_save() {
+        assert_eq!(on_close(false), SettingsOutcome::Close { save: false });
+    }
+
+    #[test]
+    fn a_close_after_a_committed_change_does_not_save_again() {
+        let (dirty, outcome) = after_frame(false, toggled());
+        assert_eq!(outcome, SettingsOutcome::Changed);
+        assert_eq!(on_close(dirty), SettingsOutcome::Close { save: false });
+    }
+
+    #[test]
+    fn a_bare_domain_is_stored_as_a_full_https_url() {
+        let mut text = "example.com".to_string();
+        assert!(normalise_url_setting(&mut text));
+        assert_eq!(text, "https://example.com/");
+    }
+
+    #[test]
+    fn surrounding_space_is_trimmed_from_a_stored_url() {
+        let mut text = "  www.example.com/path ".to_string();
+        assert!(normalise_url_setting(&mut text));
+        assert_eq!(text, "https://www.example.com/path");
+    }
+
+    #[test]
+    fn a_valid_url_is_left_unchanged() {
+        let mut text = "https://example.com/a".to_string();
+        assert!(!normalise_url_setting(&mut text));
+        assert_eq!(text, "https://example.com/a");
+    }
+
+    #[test]
+    fn text_that_is_not_a_url_is_kept_as_typed() {
+        for raw in ["not a url", "javascript:alert(1)", ""] {
+            let mut text = raw.to_string();
+            assert!(!normalise_url_setting(&mut text), "{raw:?}");
+            assert_eq!(text, raw);
+            assert!(location_input_to_url(&text).is_none(), "{raw:?} is flagged");
+        }
+    }
 }

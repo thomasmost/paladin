@@ -369,6 +369,14 @@ impl BrowserWindow {
 
         let surface = self.host.surface().expect("headed tab host has a surface");
         surface.begin_frame();
+        // egui_glow paints over whatever the framebuffer holds, so clear it
+        // first: a region egui does not draw (or a reused buffer) would
+        // otherwise show stale pixels.
+        let size = self.window.inner_size();
+        self.egui.painter.clear(
+            [size.width, size.height],
+            chrome::background(&self.egui.egui_ctx),
+        );
         self.egui.paint(&self.window);
         surface.present();
         if self.egui.egui_ctx.has_requested_repaint() {

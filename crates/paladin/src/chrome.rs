@@ -213,10 +213,22 @@ pub fn draw(
     commands
 }
 
+/// The colour the framebuffer is cleared to before egui paints: the panel
+/// fill, in the gamma-space components egui_glow's painter expects.
+pub fn background(ctx: &egui::Context) -> [f32; 4] {
+    ctx.global_style()
+        .visuals
+        .panel_fill
+        .to_normalized_gamma_f32()
+}
+
 /// Replace the page area with an error panel. Returns true if the user
 /// asked to reload.
 pub fn draw_crash_panel(ui: &mut Ui, rect: Rect, reason: &str) -> bool {
     let mut reload = false;
+    // The page is not blitted while crashed, so the panel fills its own
+    // area; nothing else paints there.
+    ui.painter().rect_filled(rect, 0.0, ui.visuals().panel_fill);
     ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
         ui.vertical_centered(|ui| {
             ui.add_space(40.0);
