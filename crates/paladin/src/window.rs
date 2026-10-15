@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use egui::{LayerId, PaintCallback};
 use egui_glow::{CallbackFn, EguiGlow};
-use paladin_core::{Browser, Command, WindowId};
+use paladin_core::{Browser, Command, Keymap, WindowId};
 use paladin_engine::{
     BlitRect, Engine, EngineError, EngineInput, GlSurface, PhysicalSize, TabHost,
 };
@@ -17,11 +17,11 @@ use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::Window;
 
 use crate::chrome::{self, ChromeState};
+use crate::input::{self, KeyRoute};
 use crate::routing::{
-    KeyRouter, KeyTarget, PointerCapture, PointerContext, PointerTarget, content_pixels,
-    route_pointer,
+    KeyRouter, PointerCapture, PointerContext, PointerTarget, content_pixels, route_pointer,
 };
-use crate::{icon, input, keyutils};
+use crate::{icon, keyutils};
 
 pub struct BrowserWindow {
     id: WindowId,
@@ -37,7 +37,8 @@ pub struct BrowserWindow {
     /// Which side holds the pointer during a drag or click. See
     /// [`PointerCapture`].
     capture: PointerCapture,
-    /// Which side each held key went to. See [`KeyRouter`].
+    /// Which side each held key went to, and which presses are keymap
+    /// commands. See [`KeyRouter`].
     keys: KeyRouter,
     egui: EguiGlow,
     host: TabHost,
@@ -148,9 +149,14 @@ impl BrowserWindow {
     }
 
     /// Handle one winit event. Returns the commands the user issued.
-    pub fn handle_event(&mut self, browser: &Browser, event: &WindowEvent) -> Vec<Command> {
+    pub fn handle_event(
+        &mut self,
+        browser: &Browser,
+        keymap: &Keymap,
+        event: &WindowEvent,
+    ) -> Vec<Command> {
         let active = browser.window(self.id).map(|w| w.active);
-        let commands = Vec::new();
+        let mut commands = Vec::new();
         let mut forward_to_egui = true;
 
         match event {
@@ -163,7 +169,7 @@ impl BrowserWindow {
                 self.window.request_redraw();
             }
             WindowEvent::RedrawRequested => {
-                return self.frame(browser);
+                return self.frame(browser, keymap);
             }
             WindowEvent::CloseRequested => {
                 return vec![Command::CloseWindow(self.id)];
@@ -242,18 +248,26 @@ impl BrowserWindow {
                 let egui_wants_keyboard = self.egui.egui_ctx.egui_wants_keyboard_input();
                 let route = self.keys.route(
                     key_input.code,
+                    key_input.modifiers,
                     key.state == ElementState::Pressed,
                     key.repeat,
                     egui_wants_keyboard,
+                    keymap,
                 );
                 match route {
-                    Some(KeyTarget::Page) => {
+                    Some(KeyRoute::Page) => {
                         forward_to_egui = false;
                         if let Some(tab) = active {
                             self.host.input(tab, EngineInput::Key(key_input));
                         }
                     }
-                    Some(KeyTarget::Egui) => {}
+                    Some(KeyRoute::Command(kind)) => {
+                        forward_to_egui = false;
+                        if let Some(tab) = active {
+                            commands.push(kind.into_command(self.id, tab));
+                        }
+                    }
+                    Some(KeyRoute::Egui) => {}
                     None => forward_to_egui = false,
                 }
             }
@@ -290,7 +304,7 @@ impl BrowserWindow {
 
     /// Draw the chrome, paint the active tab offscreen, blit it under the
     /// toolbar, and present.
-    fn frame(&mut self, browser: &Browser) -> Vec<Command> {
+    fn frame(&mut self, browser: &Browser, keymap: &Keymap) -> Vec<Command> {
         let Some(model) = browser.window(self.id) else {
             return Vec::new();
         };
@@ -308,7 +322,7 @@ impl BrowserWindow {
             ..
         } = self;
         egui.run(window, |ui| {
-            commands = chrome::draw(ui, model, engine_error, chrome_state);
+            commands = chrome::draw(ui, model, engine_error, chrome_state, keymap);
             let rect = ui.available_rect_before_wrap();
             let (top, size) = content_pixels(rect, ui.pixels_per_point());
             content_top_px = top;

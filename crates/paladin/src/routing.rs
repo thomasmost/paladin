@@ -1,14 +1,18 @@
 //! The window's routing decisions as pure functions and small state
-//! machines: which side gets a pointer event, which side gets a key event,
-//! and where the page area sits in physical pixels. The window reads egui
+//! machines: which side gets a pointer event, whether a key event is a
+//! keymap command or goes to egui or the page, and where the page area sits
+//! in physical pixels. The window reads egui
 //! and winit state and feeds it in here, so every rule has a unit test.
 
 use std::collections::HashSet;
 
 use egui::Rect;
-use keyboard_types::Code;
+use keyboard_types::{Code, Modifiers};
+use paladin_core::Keymap;
 use paladin_engine::PhysicalSize;
 use winit::event::MouseButton;
+
+use crate::input::{self, KeyRoute};
 
 /// Who receives a pointer event: the chrome (egui) or the page.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,7 +28,8 @@ pub struct PointerContext {
     pub over_chrome: bool,
     /// egui draws the page area itself (the crash panel).
     pub content_is_egui: bool,
-    /// The pointer is over an interactable egui layer (the error overlay).
+    /// The pointer is over an interactable egui layer (menus, the error
+    /// overlay).
     pub over_egui: bool,
     /// A popup is open, so a click outside it must reach egui to close it.
     pub popup_open: bool,
@@ -89,19 +94,25 @@ impl PointerCapture {
     }
 }
 
-/// Which side a key event goes to.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum KeyTarget {
-    Egui,
-    Page,
-}
-
 /// Decides where key events go and remembers which side received each
 /// press, so that side also receives the repeats and the release. The page
 /// never sees half a key stroke (for example a key pressed in another window
-/// before focus moved here), and egui never misses the release of a key it
-/// saw go down (after Enter submits the address bar, the field loses focus
-/// before the Enter release arrives).
+/// before focus moved here, or a chord that fired a command), and egui never
+/// misses the release of a key it saw go down (after Enter submits the
+/// address bar, the field loses focus before the Enter release arrives).
+///
+/// The full rule, in order:
+/// 1. A release goes to the side that got the press, whoever has focus now;
+///    a release nobody here saw pressed goes to egui while it has focus and
+///    nowhere otherwise.
+/// 2. A press or repeat is first put to [`input::route_key`]: the initial
+///    press of a bound chord is a command (while egui has focus, only chords
+///    with Cmd or Ctrl). A command takes its key away from the page, so the
+///    chord's repeats and release never reach it.
+/// 3. A press or repeat of a key the page holds stays with the page.
+/// 4. egui gets the key while it has focus, or if it got the key's press.
+/// 5. A repeat nobody here saw pressed is dropped.
+/// 6. Otherwise the page gets the press and holds the key until its release.
 #[derive(Debug, Default)]
 pub struct KeyRouter {
     page_keys: HashSet<Code>,
@@ -109,42 +120,43 @@ pub struct KeyRouter {
 }
 
 impl KeyRouter {
-    /// Route one key event. `None` means neither side sees it.
+    /// Route one key event. `None` means nobody sees it.
     pub fn route(
         &mut self,
         code: Code,
+        modifiers: Modifiers,
         pressed: bool,
         repeat: bool,
         egui_wants_keyboard: bool,
-    ) -> Option<KeyTarget> {
+        keymap: &Keymap,
+    ) -> Option<KeyRoute> {
         if !pressed {
-            // A release goes to the side that got the press, whoever has
-            // focus now.
             if self.page_keys.remove(&code) {
-                return Some(KeyTarget::Page);
+                return Some(KeyRoute::Page);
             }
             if self.egui_keys.remove(&code) {
-                return Some(KeyTarget::Egui);
+                return Some(KeyRoute::Egui);
             }
-            // A release nobody here saw pressed is only useful to egui while
-            // it has focus, so egui gets it then and nothing otherwise.
-            return egui_wants_keyboard.then_some(KeyTarget::Egui);
+            return egui_wants_keyboard.then_some(KeyRoute::Egui);
         }
-        // A press or repeat of a key the page holds stays with the page.
+        let first_cut =
+            input::route_key(egui_wants_keyboard, true, repeat, modifiers, code, keymap);
+        if let KeyRoute::Command(_) = first_cut {
+            self.page_keys.remove(&code);
+            return Some(first_cut);
+        }
         if self.page_keys.contains(&code) {
-            return Some(KeyTarget::Page);
+            return Some(KeyRoute::Page);
         }
-        if egui_wants_keyboard || self.egui_keys.contains(&code) {
+        if first_cut == KeyRoute::Egui || self.egui_keys.contains(&code) {
             self.egui_keys.insert(code);
-            return Some(KeyTarget::Egui);
+            return Some(KeyRoute::Egui);
         }
-        // A repeat with no press from this window is dropped: the page must
-        // not start a key stroke midway.
         if repeat {
             return None;
         }
         self.page_keys.insert(code);
-        Some(KeyTarget::Page)
+        Some(KeyRoute::Page)
     }
 
     /// Forget every key, for example when the window loses focus. egui does
@@ -175,6 +187,7 @@ pub fn content_pixels(rect: Rect, pixels_per_point: f32) -> (f32, PhysicalSize<u
 mod tests {
     use super::*;
     use egui::pos2;
+    use paladin_core::{CommandKind, Platform};
 
     const LEFT: MouseButton = MouseButton::Left;
     const RIGHT: MouseButton = MouseButton::Right;
@@ -347,39 +360,79 @@ mod tests {
         );
     }
 
+    fn mac() -> Keymap {
+        Keymap::defaults(Platform::MacOs)
+    }
+
+    /// An unmodified key event through `keys`.
+    fn plain(
+        keys: &mut KeyRouter,
+        code: Code,
+        pressed: bool,
+        repeat: bool,
+        egui_wants_keyboard: bool,
+    ) -> Option<KeyRoute> {
+        keys.route(
+            code,
+            Modifiers::empty(),
+            pressed,
+            repeat,
+            egui_wants_keyboard,
+            &mac(),
+        )
+    }
+
+    /// A key event with Cmd held, as macOS shortcuts arrive.
+    fn cmd(
+        keys: &mut KeyRouter,
+        code: Code,
+        pressed: bool,
+        repeat: bool,
+        egui_wants_keyboard: bool,
+    ) -> Option<KeyRoute> {
+        keys.route(
+            code,
+            Modifiers::META,
+            pressed,
+            repeat,
+            egui_wants_keyboard,
+            &mac(),
+        )
+    }
+
     #[test]
     fn page_key_gets_its_repeats_and_release() {
         let mut keys = KeyRouter::default();
         assert_eq!(
-            keys.route(Code::KeyA, true, false, false),
-            Some(KeyTarget::Page)
+            plain(&mut keys, Code::KeyA, true, false, false),
+            Some(KeyRoute::Page)
         );
         assert_eq!(
-            keys.route(Code::KeyA, true, true, false),
-            Some(KeyTarget::Page)
+            plain(&mut keys, Code::KeyA, true, true, false),
+            Some(KeyRoute::Page)
         );
         assert_eq!(
-            keys.route(Code::KeyA, false, false, false),
-            Some(KeyTarget::Page)
+            plain(&mut keys, Code::KeyA, false, false, false),
+            Some(KeyRoute::Page)
         );
         // Released: a later release is no longer the page's.
-        assert_eq!(keys.route(Code::KeyA, false, false, false), None);
+        assert_eq!(plain(&mut keys, Code::KeyA, false, false, false), None);
     }
 
     #[test]
     fn key_pressed_while_egui_has_focus_goes_to_egui() {
         let mut keys = KeyRouter::default();
         assert_eq!(
-            keys.route(Code::KeyA, true, false, true),
-            Some(KeyTarget::Egui)
+            plain(&mut keys, Code::KeyA, true, false, true),
+            Some(KeyRoute::Egui)
         );
         assert_eq!(
-            keys.route(Code::KeyA, true, true, true),
-            Some(KeyTarget::Egui)
+            plain(&mut keys, Code::KeyA, true, true, true),
+            Some(KeyRoute::Egui)
         );
         assert_eq!(
-            keys.route(Code::KeyA, false, false, true),
-            Some(KeyTarget::Egui)
+            plain(&mut keys, Code::KeyA, false, false, true),
+            Some(KeyRoute::Egui)
         );
     }
 
@@ -389,24 +442,24 @@ mod tests {
     fn egui_gets_the_release_after_it_lost_focus() {
         let mut keys = KeyRouter::default();
         assert_eq!(
-            keys.route(Code::Enter, true, false, true),
-            Some(KeyTarget::Egui)
+            plain(&mut keys, Code::Enter, true, false, true),
+            Some(KeyRoute::Egui)
         );
         assert_eq!(
-            keys.route(Code::Enter, false, false, false),
-            Some(KeyTarget::Egui)
+            plain(&mut keys, Code::Enter, false, false, false),
+            Some(KeyRoute::Egui)
         );
         // Nothing left to deliver.
-        assert_eq!(keys.route(Code::Enter, false, false, false), None);
+        assert_eq!(plain(&mut keys, Code::Enter, false, false, false), None);
     }
 
     #[test]
     fn repeat_of_an_egui_key_still_goes_to_egui_after_focus_moves() {
         let mut keys = KeyRouter::default();
-        keys.route(Code::Backspace, true, false, true);
+        plain(&mut keys, Code::Backspace, true, false, true);
         assert_eq!(
-            keys.route(Code::Backspace, true, true, false),
-            Some(KeyTarget::Egui)
+            plain(&mut keys, Code::Backspace, true, true, false),
+            Some(KeyRoute::Egui)
         );
     }
 
@@ -414,35 +467,77 @@ mod tests {
     fn page_never_sees_a_repeat_or_release_it_did_not_start() {
         let mut keys = KeyRouter::default();
         // Repeat with no press from this window.
-        assert_eq!(keys.route(Code::KeyB, true, true, false), None);
+        assert_eq!(plain(&mut keys, Code::KeyB, true, true, false), None);
         // A release for a key pressed elsewhere, with no egui focus.
-        assert_eq!(keys.route(Code::KeyB, false, false, false), None);
+        assert_eq!(plain(&mut keys, Code::KeyB, false, false, false), None);
     }
 
     #[test]
     fn a_key_held_by_the_page_stays_with_the_page_even_if_egui_gets_focus() {
         let mut keys = KeyRouter::default();
-        keys.route(Code::KeyC, true, false, false);
+        plain(&mut keys, Code::KeyC, true, false, false);
         // Focus moved to egui while C is held: the repeat and release stay
         // with the page so it never sees half a stroke.
         assert_eq!(
-            keys.route(Code::KeyC, true, true, true),
-            Some(KeyTarget::Page)
+            plain(&mut keys, Code::KeyC, true, true, true),
+            Some(KeyRoute::Page)
         );
         assert_eq!(
-            keys.route(Code::KeyC, false, false, true),
-            Some(KeyTarget::Page)
+            plain(&mut keys, Code::KeyC, false, false, true),
+            Some(KeyRoute::Page)
         );
     }
 
     #[test]
     fn clearing_forgets_both_sides() {
         let mut keys = KeyRouter::default();
-        keys.route(Code::KeyA, true, false, false);
-        keys.route(Code::Enter, true, false, true);
+        plain(&mut keys, Code::KeyA, true, false, false);
+        plain(&mut keys, Code::Enter, true, false, true);
         keys.clear();
-        assert_eq!(keys.route(Code::KeyA, false, false, false), None);
-        assert_eq!(keys.route(Code::Enter, false, false, false), None);
+        assert_eq!(plain(&mut keys, Code::KeyA, false, false, false), None);
+        assert_eq!(plain(&mut keys, Code::Enter, false, false, false), None);
+    }
+
+    /// Holding Cmd+T over the page opens one tab: the press is a command,
+    /// and its repeats and release reach neither the page nor egui.
+    #[test]
+    fn a_command_chord_never_reaches_the_page() {
+        let mut keys = KeyRouter::default();
+        assert_eq!(
+            cmd(&mut keys, Code::KeyT, true, false, false),
+            Some(KeyRoute::Command(CommandKind::NewTab))
+        );
+        assert_eq!(cmd(&mut keys, Code::KeyT, true, true, false), None);
+        assert_eq!(cmd(&mut keys, Code::KeyT, false, false, false), None);
+    }
+
+    /// A lost release left T with the page; a fresh Cmd+T press still fires
+    /// the command and takes T away from the page, so the page never sees
+    /// the chord's repeats or release.
+    #[test]
+    fn a_command_takes_its_key_back_from_the_page() {
+        let mut keys = KeyRouter::default();
+        plain(&mut keys, Code::KeyT, true, false, false);
+        assert_eq!(
+            cmd(&mut keys, Code::KeyT, true, false, false),
+            Some(KeyRoute::Command(CommandKind::NewTab))
+        );
+        assert_eq!(cmd(&mut keys, Code::KeyT, true, true, false), None);
+        assert_eq!(cmd(&mut keys, Code::KeyT, false, false, false), None);
+    }
+
+    /// Cmd+T in the address bar opens a tab; Cmd+A stays egui's select-all.
+    #[test]
+    fn primary_chords_fire_while_egui_has_focus() {
+        let mut keys = KeyRouter::default();
+        assert_eq!(
+            cmd(&mut keys, Code::KeyT, true, false, true),
+            Some(KeyRoute::Command(CommandKind::NewTab))
+        );
+        assert_eq!(
+            cmd(&mut keys, Code::KeyA, true, false, true),
+            Some(KeyRoute::Egui)
+        );
     }
 
     #[test]

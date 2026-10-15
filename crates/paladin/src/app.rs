@@ -3,8 +3,8 @@
 //!
 //! One iteration, for every winit event:
 //! 1. The window the event belongs to handles it: chrome events go to egui,
-//!    content events go to the active tab through the engine. This yields
-//!    `Command`s.
+//!    content events go to the active tab through the engine, key chords
+//!    are resolved through the keymap. This yields `Command`s.
 //! 2. `dispatch` turns each `Command` into model changes plus
 //!    `EngineAction`s, which `perform` forwards to the engine or handles.
 //! 3. The engine spins; its `EngineEvent`s are drained into `apply`, whose
@@ -15,13 +15,17 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use paladin_core::{Browser, Command, EngineAction, EngineEvent, TabId, WindowId, apply, dispatch};
+use paladin_core::{
+    Browser, Command, CommandKind, EngineAction, EngineEvent, Keymap, TabId, WindowId, apply,
+    dispatch,
+};
 use paladin_engine::{Engine, Waker};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 
 use crate::icon;
+use crate::settings_window::{SettingsOutcome, SettingsWindow};
 use crate::window::BrowserWindow;
 
 /// The only user event: the engine asked us to spin its event loop.
@@ -46,9 +50,11 @@ impl Waker for WinitWaker {
 
 pub struct App {
     browser: Browser,
+    keymap: Keymap,
     // Windows are declared before `engine` so they drop first: every tab
     // host and GL surface must be gone before the engine shuts down.
     windows: HashMap<winit::window::WindowId, BrowserWindow>,
+    settings_window: Option<SettingsWindow>,
     pending_actions: Vec<EngineAction>,
     engine: Option<Engine>,
     waker: Arc<WinitWaker>,
@@ -64,12 +70,15 @@ impl App {
     /// event loop is active and the engine exists.
     pub fn new(
         browser: Browser,
+        keymap: Keymap,
         initial_actions: Vec<EngineAction>,
         event_loop: &EventLoop<AppEvent>,
     ) -> App {
         App {
             browser,
+            keymap,
             windows: HashMap::new(),
+            settings_window: None,
             pending_actions: initial_actions,
             engine: None,
             waker: Arc::new(WinitWaker(Mutex::new(event_loop.create_proxy()))),
@@ -232,11 +241,16 @@ impl App {
                     w.focus_address_bar();
                 }
             }
-            EngineAction::OpenSettings => {
-                log::info!("the settings window arrives in Phase 5");
-            }
+            EngineAction::OpenSettings => match &self.settings_window {
+                Some(sw) => sw.focus(),
+                None => match SettingsWindow::open(event_loop, engine) {
+                    Ok(sw) => self.settings_window = Some(sw),
+                    Err(e) => log::error!("cannot open settings window: {e}"),
+                },
+            },
             EngineAction::Quit => {
                 self.exiting = true;
+                self.close_settings_window();
                 self.windows.clear();
                 event_loop.exit();
             }
@@ -274,6 +288,41 @@ impl App {
             if self.exiting {
                 return;
             }
+        }
+    }
+
+    fn save_settings(&self) {
+        let path = self.browser.profile.settings_path();
+        if let Err(e) = self.browser.settings.save(&path) {
+            log::error!("cannot save settings to {}: {e}", path.display());
+        }
+    }
+
+    /// Drop the settings window, saving an uncommitted edit first.
+    fn close_settings_window(&mut self) {
+        if self
+            .settings_window
+            .as_ref()
+            .is_some_and(|sw| sw.needs_save())
+        {
+            self.save_settings();
+        }
+        self.settings_window = None;
+    }
+
+    /// A keymap chord pressed while the settings window had focus.
+    fn settings_shortcut(&mut self, kind: CommandKind, event_loop: &ActiveEventLoop) {
+        match kind {
+            CommandKind::Quit => self.run_commands(vec![Command::Quit], event_loop),
+            CommandKind::NewWindow => self.run_commands(vec![Command::NewWindow], event_loop),
+            CommandKind::CloseWindow | CommandKind::CloseTab => self.close_settings_window(),
+            CommandKind::OpenSettings => {
+                if let Some(sw) = &self.settings_window {
+                    sw.focus();
+                }
+            }
+            // Tab and page commands need a browser window; ignore them here.
+            _ => {}
         }
     }
 }
@@ -328,8 +377,25 @@ impl ApplicationHandler<AppEvent> for App {
         if self.exiting {
             return;
         }
-        if let Some(window) = self.windows.get_mut(&window_id) {
-            let commands = window.handle_event(&self.browser, &event);
+        if self
+            .settings_window
+            .as_ref()
+            .is_some_and(|sw| sw.winit_id() == window_id)
+        {
+            let sw = self.settings_window.as_mut().expect("checked above");
+            match sw.handle_event(&event, &mut self.browser.settings, &self.keymap) {
+                SettingsOutcome::Nothing => {}
+                SettingsOutcome::Changed => self.save_settings(),
+                SettingsOutcome::Close { save } => {
+                    if save {
+                        self.save_settings();
+                    }
+                    self.settings_window = None;
+                }
+                SettingsOutcome::Shortcut(kind) => self.settings_shortcut(kind, event_loop),
+            }
+        } else if let Some(window) = self.windows.get_mut(&window_id) {
+            let commands = window.handle_event(&self.browser, &self.keymap, &event);
             self.run_commands(commands, event_loop);
         }
         self.pump(event_loop);
@@ -352,6 +418,7 @@ impl ApplicationHandler<AppEvent> for App {
     /// down in dependency order: windows (tab hosts, GL) before the engine.
     fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
         self.exiting = true;
+        self.close_settings_window();
         self.windows.clear();
         self.engine = None;
     }

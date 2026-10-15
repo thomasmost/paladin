@@ -6,7 +6,8 @@ use std::net::Ipv4Addr;
 use std::sync::Arc;
 
 use egui::{Button, ColorImage, Id, Key, Panel, Rect, TextureHandle, TextureOptions, Ui, Vec2};
-use paladin_core::{Command, Favicon, LoadState, TabId, Window};
+use keyboard_types::Code;
+use paladin_core::{Command, CommandKind, Favicon, KeyChord, Keymap, LoadState, TabId, Window};
 use url::{ParseError, Url};
 
 const TAB_TITLE_MAX_CHARS: usize = 24;
@@ -45,6 +46,7 @@ pub fn draw(
     window: &Window,
     engine_error: Option<&str>,
     state: &mut ChromeState,
+    keymap: &Keymap,
 ) -> Vec<Command> {
     let mut commands = Vec::new();
     let active = window.active_tab();
@@ -78,12 +80,37 @@ pub fn draw(
                         }
                         ui.add_space(4.0);
                     }
-                    if ui.button("+").on_hover_text("New tab").clicked() {
+                    if ui
+                        .button("+")
+                        .on_hover_text(hint(keymap, CommandKind::NewTab, "New tab"))
+                        .clicked()
+                    {
                         commands.push(Command::NewTab {
                             window: window.id,
                             url: None,
                         });
                     }
+                    ui.menu_button("☰", |ui| {
+                        if ui
+                            .button(hint(keymap, CommandKind::NewWindow, "New window"))
+                            .clicked()
+                        {
+                            commands.push(Command::NewWindow);
+                            ui.close();
+                        }
+                        if ui
+                            .button(hint(keymap, CommandKind::OpenSettings, "Settings"))
+                            .clicked()
+                        {
+                            commands.push(Command::OpenSettings);
+                            ui.close();
+                        }
+                        ui.separator();
+                        if ui.button(hint(keymap, CommandKind::Quit, "Quit")).clicked() {
+                            commands.push(Command::Quit);
+                            ui.close();
+                        }
+                    });
                 });
             });
     });
@@ -92,21 +119,25 @@ pub fn draw(
         ui.horizontal(|ui| {
             if ui
                 .add_enabled(active.can_go_back, Button::new("◀"))
-                .on_hover_text("Back")
+                .on_hover_text(hint(keymap, CommandKind::Back, "Back"))
                 .clicked()
             {
                 commands.push(Command::Back(active.id));
             }
             if ui
                 .add_enabled(active.can_go_forward, Button::new("▶"))
-                .on_hover_text("Forward")
+                .on_hover_text(hint(keymap, CommandKind::Forward, "Forward"))
                 .clicked()
             {
                 commands.push(Command::Forward(active.id));
             }
             // Reload is always available (a hung load must be recoverable);
             // Stop appears beside it while loading.
-            if ui.button("⟳").on_hover_text("Reload").clicked() {
+            if ui
+                .button("⟳")
+                .on_hover_text(hint(keymap, CommandKind::Reload, "Reload"))
+                .clicked()
+            {
                 state.address_dirty = false;
                 commands.push(Command::Reload(active.id));
             }
@@ -114,7 +145,10 @@ pub fn draw(
             // stays disabled so the UI does not promise what the engine lacks.
             if active.load == LoadState::Loading {
                 ui.add_enabled(false, Button::new("✕"))
-                    .on_disabled_hover_text("Stop (not supported by Servo 0.7.0)");
+                    .on_disabled_hover_text(format!(
+                        "{} (not supported by Servo 0.7.0)",
+                        hint(keymap, CommandKind::Stop, "Stop")
+                    ));
             }
 
             let address_id = Id::new(("address", window.id));
@@ -334,9 +368,76 @@ fn truncate(text: &str, max_chars: usize) -> String {
     out
 }
 
+/// A label with its shortcut, like "New tab (Cmd+T)".
+fn hint(keymap: &Keymap, kind: CommandKind, label: &str) -> String {
+    match keymap.chord_for(kind) {
+        Some(chord) => format!("{label} ({})", describe_chord(chord)),
+        None => label.to_string(),
+    }
+}
+
+/// A readable name for a chord: modifiers in Ctrl, Alt, Shift, Cmd order,
+/// then the key.
+fn describe_chord(chord: KeyChord) -> String {
+    use keyboard_types::Modifiers;
+    let mut parts: Vec<String> = Vec::new();
+    if chord.modifiers.contains(Modifiers::CONTROL) {
+        parts.push("Ctrl".to_string());
+    }
+    if chord.modifiers.contains(Modifiers::ALT) {
+        parts.push(
+            if cfg!(target_os = "macos") {
+                "Option"
+            } else {
+                "Alt"
+            }
+            .to_string(),
+        );
+    }
+    if chord.modifiers.contains(Modifiers::SHIFT) {
+        parts.push("Shift".to_string());
+    }
+    if chord.modifiers.contains(Modifiers::META) {
+        parts.push(
+            if cfg!(target_os = "macos") {
+                "Cmd"
+            } else {
+                "Win"
+            }
+            .to_string(),
+        );
+    }
+    parts.push(key_name(chord.code));
+    parts.join("+")
+}
+
+fn key_name(code: Code) -> String {
+    let name = match code {
+        Code::BracketLeft => "[",
+        Code::BracketRight => "]",
+        Code::Comma => ",",
+        Code::Period => ".",
+        Code::ArrowLeft => "Left",
+        Code::ArrowRight => "Right",
+        Code::ArrowUp => "Up",
+        Code::ArrowDown => "Down",
+        Code::Escape => "Esc",
+        other => {
+            let debug = format!("{other:?}");
+            return debug
+                .strip_prefix("Key")
+                .or_else(|| debug.strip_prefix("Digit"))
+                .unwrap_or(&debug)
+                .to_string();
+        }
+    };
+    name.to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use keyboard_types::Modifiers;
 
     #[test]
     fn full_urls_pass_through() {
@@ -474,5 +575,32 @@ mod tests {
     fn truncate_adds_ellipsis_only_when_cut() {
         assert_eq!(truncate("short", 10), "short");
         assert_eq!(truncate("a longer title here", 8), "a longer…");
+    }
+
+    #[test]
+    fn chord_labels_are_readable() {
+        assert_eq!(
+            describe_chord(KeyChord::new(Modifiers::CONTROL, Code::KeyT)),
+            "Ctrl+T"
+        );
+        assert_eq!(
+            describe_chord(KeyChord::new(
+                Modifiers::CONTROL | Modifiers::SHIFT,
+                Code::BracketRight
+            )),
+            "Ctrl+Shift+]"
+        );
+        assert_eq!(
+            describe_chord(KeyChord::new(Modifiers::CONTROL, Code::Comma)),
+            "Ctrl+,"
+        );
+        assert_eq!(
+            describe_chord(KeyChord::new(Modifiers::CONTROL, Code::Digit1)),
+            "Ctrl+1"
+        );
+        assert_eq!(
+            describe_chord(KeyChord::new(Modifiers::empty(), Code::F5)),
+            "F5"
+        );
     }
 }

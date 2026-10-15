@@ -6,6 +6,7 @@ mod icon;
 mod input;
 mod keyutils;
 mod routing;
+mod settings_window;
 mod window;
 
 use std::process::ExitCode;
@@ -13,7 +14,7 @@ use std::process::ExitCode;
 use clap::Parser;
 use paladin_core::command::open_window;
 use paladin_core::profile::DEFAULT_PROFILE_NAME;
-use paladin_core::{Browser, Command, Profile, Settings, dispatch};
+use paladin_core::{Browser, Command, Keymap, Platform, Profile, Settings, dispatch};
 use url::Url;
 use winit::event_loop::{ControlFlow, EventLoop};
 
@@ -68,6 +69,7 @@ fn main() -> ExitCode {
     }
 
     let mut browser = Browser::new(profile, settings);
+    let keymap = Keymap::defaults(Platform::current());
     let first: Url = urls.first().cloned().unwrap_or_else(|| browser.homepage());
     let mut actions = open_window(&mut browser, first);
     let window = browser.windows[0].id;
@@ -83,8 +85,8 @@ fn main() -> ExitCode {
 
     let mut builder = EventLoop::<AppEvent>::with_user_event();
     // winit's default macOS menu owns Cmd+Q: AppKit runs `terminate:`
-    // before the window sees the key. Without the menu, the app's own
-    // shutdown path runs instead (the keymap binds Cmd+Q in Phase 5).
+    // before the window sees the key. Without the menu, the keymap's Quit
+    // command runs the normal shutdown instead.
     #[cfg(target_os = "macos")]
     {
         use winit::platform::macos::EventLoopBuilderExtMacOS;
@@ -98,7 +100,7 @@ fn main() -> ExitCode {
         }
     };
     event_loop.set_control_flow(ControlFlow::Wait);
-    let mut app = App::new(browser, actions, &event_loop);
+    let mut app = App::new(browser, keymap, actions, &event_loop);
     match event_loop.run_app(&mut app) {
         Ok(()) if app.started_cleanly() => ExitCode::SUCCESS,
         Ok(()) => ExitCode::FAILURE,
