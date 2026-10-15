@@ -27,6 +27,9 @@ releases yet; `Unreleased` holds everything on `main`.
   status overlay for link targets and engine errors, the logo as window and
   Dock icon, `--profile` and URL arguments, and a manual checklist in the
   README.
+- Multiple windows, a settings window that persists the homepage, new-tab
+  URL, and restore option to the profile, keyboard shortcuts for every
+  command with macOS and Windows defaults, and a window menu.
 
 ### Fixed
 

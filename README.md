@@ -100,6 +100,28 @@ or engine glue. Each item must pass.
    address bar's selection does not keep growing either.
 7. **Exit.** Closing the window exits with no Servo error output on the
    terminal. Quitting from the Dock menu does the same.
+8. **Windows and menu.** Cmd+N (Ctrl+N on Windows), or New window chosen
+   with the mouse from the "☰" menu, opens a second window; each window's
+   tabs, address bar, and page are independent, and closing one leaves the
+   other working. Clicking on the page outside an open menu closes the menu
+   without the click reaching the page.
+9. **Shortcuts.** With Cmd on macOS or Ctrl on Windows: T new tab, W close
+   tab, Shift+W close window, N new window, L focus the address bar with
+   its text selected, R reload, period stop, Shift+] and Shift+[ next and
+   previous tab (wrapping), comma opens settings, Q quits. Back and forward
+   are Cmd+[ and Cmd+] on macOS and Alt+Left and Alt+Right on Windows. A
+   chord held down fires once, and none of its key strokes reach the page.
+   Shortcuts also work while the address bar has focus. Escape and
+   Cmd+Left/Right are not shortcuts and do reach the page.
+10. **Settings.** Settings (Cmd+, or chosen with the mouse from the menu)
+    opens a window with Homepage, New tab URL, and the restore checkbox.
+    Edits are saved when a field loses focus or the window closes;
+    relaunching opens the new homepage, and `settings.toml` in the profile
+    directory holds it. With the settings window focused, Cmd+W closes it
+    and Cmd+Q quits.
+11. **Clean exit.** Closing the last window, Cmd+Q from a browser window or
+    from the settings window, and Quit from the Dock menu (macOS) all exit
+    with code 0 and no Servo error output.
 
 ## Todo
 
