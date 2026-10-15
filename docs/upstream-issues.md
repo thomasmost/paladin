@@ -223,8 +223,11 @@ Kept so nobody waits on upstream for them.
   account: it recomputes its own flag every frame and calls
   `set_ime_allowed` whenever that differs from its stored value, so Paladin
   must leave the stored flag to egui and re-assert `set_ime_allowed(true)`
-  after each `handle_platform_output` while a page control is shown. Listed
-  in the README todo.
+  after each `handle_platform_output` while a page control is shown. On
+  Windows egui-winit also uses that stored flag to drop key events the IME
+  has already consumed (winit bug #4508), so with the flag left false
+  Paladin's own key routing has to drop them before they reach the page.
+  Listed in the README todo.
 
 ## Toolchain and packaging
 
