@@ -89,14 +89,17 @@ Run from the repo root:
   `egui_glow`, `glow`, and `surfman` are pinned to exact versions in the
   workspace `Cargo.toml` because they share a GL context and raw window
   handles. To bump Servo: in `~/vibes/servo`, `git fetch upstream --tags`,
-  branch `paladin/<new>` from the new tag, `git rebase --onto v<new>
-  v<old> paladin/<old>` the patch commits onto it (drop any upstream has
-  merged), do the same in `~/vibes/stylo` for the stylo version that
-  release's root `Cargo.toml` pins, publish both dist branches; in Paladin
-  set `servo = "=<new>"` in `crates/paladin-engine/Cargo.toml`, change the
-  `branch = ...` values in the root `[patch.crates-io]` table (and the
-  stylo crate list if the release's stylo workspace changed), set the
-  other pins to the versions in that release's root `Cargo.toml` and
+  `git checkout -b paladin/<new> paladin/<old>`, then `git rebase --onto
+  v<new> v<old>` to replay the patch commits onto the new tag (drop any
+  patch upstream has merged; `paladin/<old>` itself is not rewritten). Do
+  the same steps in `~/vibes/stylo` for the stylo version that release's
+  root `Cargo.toml` pins. Publish both dist branches with
+  `etc/paladin/publish-dist.sh` and make each the fork's default branch
+  (`gh repo edit thomasmost/<repo> --default-branch dist/paladin-<new>`);
+  in Paladin set `servo = "=<new>"` in `crates/paladin-engine/Cargo.toml`,
+  change the `branch = ...` values in the root `[patch.crates-io]` table
+  (and the stylo crate list if the release's stylo workspace changed), set
+  the other pins to the versions in that release's root `Cargo.toml` and
   `ports/servoshell/Cargo.toml`, set `rust-toolchain.toml` to its channel,
   run `cargo update`, then pin any pre-release crates to the versions in
   Servo's own `Cargo.lock` (0.7.0 needs
