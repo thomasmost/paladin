@@ -30,6 +30,8 @@ releases yet; `Unreleased` holds everything on `main`.
 - Multiple windows, a settings window that persists the homepage, new-tab
   URL, and restore option to the profile, keyboard shortcuts for every
   command with macOS and Windows defaults, and a window menu.
+- Packaging with cargo-packager: `Paladin.app` and a `.dmg` on macOS, an NSIS
+  installer on Windows, built and uploaded by CI.
 
 ### Fixed
 

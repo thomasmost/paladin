@@ -4,7 +4,7 @@ A desktop web browser for macOS and Windows. Servo renders pages, egui draws
 the chrome, winit owns the windows. Everything that touches Servo lives in one
 crate so the engine could be replaced without rewriting the model or the UI.
 
-_Last updated: 2026-10-14._
+_Last updated: 2026-10-15._
 
 ## Architecture
 

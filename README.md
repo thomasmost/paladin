@@ -123,6 +123,47 @@ or engine glue. Each item must pass.
     from the settings window, and Quit from the Dock menu (macOS) all exit
     with code 0 and no Servo error output.
 
+## Packaging
+
+`cargo install cargo-packager --version 0.11.8 --locked` once, then:
+
+```bash
+cargo build --release -p paladin
+cargo xtask angle-dlls release   # Windows only
+cargo packager --release -p paladin
+```
+
+Output lands in `target/release/`: `Paladin.app` and `Paladin_<version>_aarch64.dmg`
+on macOS, `paladin_<version>_x64-setup.exe` (NSIS, per-user install) on
+Windows. The bundles are unsigned. CI builds both on every push to `main` and
+uploads them as workflow artifacts named `paladin-macos-15` and
+`paladin-windows-2025`.
+
+### Windows prerequisites
+
+- Visual Studio 2022 Build Tools with the "Desktop development with C++"
+  workload: MSVC v143, a Windows 10/11 SDK (10.0.19041 or newer), and C++ ATL.
+- LLVM (any recent release from https://releases.llvm.org/) with the
+  environment variable `LIBCLANG_PATH` set to its `bin` directory, for
+  example `C:\Program Files\LLVM\bin`.
+- Python 3.11 or newer on `PATH`.
+- Rust via https://win.rustup.rs/; the pinned toolchain installs on first use.
+
+No CMake, Ninja, MozTools, or GStreamer: SpiderMonkey is downloaded prebuilt
+and media is disabled. After `cargo build`, run `cargo xtask angle-dlls`
+before `cargo run` so `libEGL.dll` and `libGLESv2.dll` sit next to the
+executable.
+
+### Known limitations
+
+- No audio or video playback (Servo's `media-gstreamer` feature is off).
+- No search engine: address-bar text that is not a URL is ignored.
+- Stop is disabled while a page loads (Servo 0.7.0 has no API for it).
+- No macOS application menu: winit's default menu is turned off so that
+  Cmd+Q reaches Paladin's own shortcut handling, which also removes Cmd+H
+  (hide) and Cmd+M (minimize). A custom menu is planned.
+- No bookmarks, history UI, downloads UI, extensions, sync, or auto-update.
+
 ## Todo
 
 - [ ] Phase 2: remappable hotkeys, profiles, moving tabs between windows
