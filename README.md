@@ -106,3 +106,4 @@ or engine glue. Each item must pass.
 - [ ] Phase 2: remappable hotkeys, profiles, moving tabs between windows
 - [ ] Media playback (the `media-gstreamer` feature is off; no audio or video)
 - [ ] A search engine for address-bar text that is not a URL
+- [ ] IME composition for page text fields: egui-winit disables IME while no chrome field has focus
