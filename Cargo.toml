@@ -1,5 +1,7 @@
 [workspace]
 members = ["crates/paladin-core", "crates/paladin-engine", "crates/paladin", "xtask"]
+# `cargo run` with no package flag runs the browser.
+default-members = ["crates/paladin"]
 resolver = "3"
 
 [workspace.package]
