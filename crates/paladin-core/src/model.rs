@@ -222,6 +222,21 @@ mod tests {
     }
 
     #[test]
+    fn homepage_uses_setting_when_valid() {
+        let mut b = browser();
+        b.settings.homepage = "https://home.example/".to_string();
+        assert_eq!(b.homepage().as_str(), "https://home.example/");
+    }
+
+    #[test]
+    fn homepage_falls_back_to_new_tab_url_when_invalid() {
+        let mut b = browser();
+        b.settings.homepage = "not a url".to_string();
+        b.settings.new_tab_url = "https://n.example/".to_string();
+        assert_eq!(b.homepage().as_str(), "https://n.example/");
+    }
+
+    #[test]
     fn ids_are_allocated_sequentially() {
         let mut b = browser();
         assert_eq!(b.allocate_tab_id(), TabId(1));
