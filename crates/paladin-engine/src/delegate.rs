@@ -170,11 +170,20 @@ impl ServoDelegate for DelegateState {
 }
 
 /// Convert Servo's favicon image to straight RGBA8.
-fn favicon_from(image: &Image) -> Option<Favicon> {
-    let (width, height) = (image.width, image.height);
+pub(crate) fn favicon_from(image: &Image) -> Option<Favicon> {
+    favicon_from_pixels(image.format, image.width, image.height, image.data())
+}
+
+/// The conversion behind [`favicon_from`], over raw pixels so tests can
+/// cover every format without building a Servo `Image`.
+fn favicon_from_pixels(
+    format: PixelFormat,
+    width: u32,
+    height: u32,
+    data: &[u8],
+) -> Option<Favicon> {
     let pixels = (width as usize) * (height as usize);
-    let data = image.data();
-    let rgba: Vec<u8> = match image.format {
+    let rgba: Vec<u8> = match format {
         PixelFormat::RGBA8 => data.to_vec(),
         PixelFormat::BGRA8 => data
             .as_chunks::<4>()
@@ -205,4 +214,89 @@ fn favicon_from(image: &Image) -> Option<Favicon> {
         height,
         rgba,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PixelFormat, favicon_from_pixels};
+
+    fn rgba_of(format: PixelFormat, width: u32, height: u32, data: &[u8]) -> Option<Vec<u8>> {
+        favicon_from_pixels(format, width, height, data).map(|f| f.rgba)
+    }
+
+    #[test]
+    fn rgba_passes_through_unchanged() {
+        let data = [1, 2, 3, 4, 5, 6, 7, 8];
+        assert_eq!(
+            rgba_of(PixelFormat::RGBA8, 2, 1, &data),
+            Some(data.to_vec())
+        );
+    }
+
+    #[test]
+    fn bgra_swaps_red_and_blue() {
+        // Two pixels: B,G,R,A then B,G,R,A.
+        let data = [3, 2, 1, 4, 7, 6, 5, 8];
+        assert_eq!(
+            rgba_of(PixelFormat::BGRA8, 2, 1, &data),
+            Some(vec![1, 2, 3, 4, 5, 6, 7, 8])
+        );
+    }
+
+    #[test]
+    fn rgb_gains_opaque_alpha() {
+        let data = [1, 2, 3, 4, 5, 6];
+        assert_eq!(
+            rgba_of(PixelFormat::RGB8, 1, 2, &data),
+            Some(vec![1, 2, 3, 255, 4, 5, 6, 255])
+        );
+    }
+
+    #[test]
+    fn k8_replicates_luminance_with_opaque_alpha() {
+        let data = [10, 200];
+        assert_eq!(
+            rgba_of(PixelFormat::K8, 2, 1, &data),
+            Some(vec![10, 10, 10, 255, 200, 200, 200, 255])
+        );
+    }
+
+    #[test]
+    fn ka8_replicates_luminance_and_keeps_alpha() {
+        let data = [10, 128, 200, 64];
+        assert_eq!(
+            rgba_of(PixelFormat::KA8, 2, 1, &data),
+            Some(vec![10, 10, 10, 128, 200, 200, 200, 64])
+        );
+    }
+
+    #[test]
+    fn every_format_rejects_a_short_buffer() {
+        // A 2x2 image needs 4 pixels: 16 RGBA bytes, 12 RGB, 8 KA, 4 K.
+        let formats = [
+            (PixelFormat::RGBA8, 4),
+            (PixelFormat::BGRA8, 4),
+            (PixelFormat::RGB8, 3),
+            (PixelFormat::KA8, 2),
+            (PixelFormat::K8, 1),
+        ];
+        for (format, bytes_per_pixel) in formats {
+            let short = vec![0u8; 4 * bytes_per_pixel - 1];
+            assert!(
+                rgba_of(format, 2, 2, &short).is_none(),
+                "{format:?} accepted a short buffer"
+            );
+        }
+    }
+
+    #[test]
+    fn rgba_rejects_a_buffer_longer_than_the_image() {
+        let long = vec![0u8; 4 * 2 * 2 + 1];
+        assert!(rgba_of(PixelFormat::RGBA8, 2, 2, &long).is_none());
+    }
+
+    #[test]
+    fn empty_image_yields_empty_favicon() {
+        assert_eq!(rgba_of(PixelFormat::RGBA8, 0, 0, &[]), Some(Vec::new()));
+    }
 }
