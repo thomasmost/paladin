@@ -19,5 +19,6 @@ releases yet; `Unreleased` holds everything on `main`.
   on) on every platform, settings are saved atomically, and Back and Forward
   clear a crashed tab's error panel.
 - Engine crate embedding Servo 0.7.0: one engine per process, a GL surface
-  per window, a tab host that paints tabs offscreen, and a headless test that
-  loads a page without a window.
+  per window, a tab host that paints tabs offscreen, a headless test that
+  loads a page without a window, and popups opened by `window.open` that keep
+  their back and forward state and favicon when adopted.

@@ -21,7 +21,7 @@ use servo::{
 };
 use url::Url;
 
-use crate::delegate::DelegateState;
+use crate::delegate::{DelegateState, favicon_from};
 use crate::engine::{Engine, EngineError};
 use crate::input::{EngineInput, to_servo};
 
@@ -180,6 +180,15 @@ impl TabHost {
         };
         self.delegate
             .push(EngineEvent::LoadStateChanged { tab, state });
+        self.delegate.push(EngineEvent::HistoryChanged {
+            tab,
+            can_go_back: webview.can_go_back(),
+            can_go_forward: webview.can_go_forward(),
+        });
+        if let Some(favicon) = webview.favicon().and_then(|image| favicon_from(&image)) {
+            self.delegate
+                .push(EngineEvent::FaviconChanged { tab, favicon });
+        }
         webview.show();
         self.tabs.insert(tab, webview);
         true
@@ -283,7 +292,11 @@ impl TabHost {
     }
 
     /// A callback that blits the offscreen target into the window; `None`
-    /// before the first paint or for a software host.
+    /// for a software host. A window host always returns `Some`, because
+    /// its framebuffer exists from construction. The callback captures the
+    /// framebuffer id and size when it is made, and `resize_content` deletes
+    /// and recreates that framebuffer, so callers must fetch a fresh callback
+    /// each frame rather than keep one across a resize.
     pub fn blit_callback(&self) -> Option<BlitFn> {
         let render = self.offscreen.as_ref()?.render_to_parent_callback()?;
         Some(Box::new(move |gl, rect: BlitRect| {
