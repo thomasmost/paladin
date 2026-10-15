@@ -129,14 +129,15 @@ or engine glue. Each item must pass.
 `cargo install cargo-packager --version 0.11.8 --locked` once, then:
 
 ```bash
-cargo xtask angle-dlls release   # Windows only, after the build
+cargo build --release -p paladin
+cargo xtask angle-dlls release   # Windows only
 cargo packager --release -p paladin
 ```
 
-`cargo packager` runs `cargo build --release -p paladin` first (its
+`cargo packager` also runs `cargo build --release -p paladin` itself (its
 `before-packaging-command`), so the bundles always match the current source.
-Run the ANGLE DLL step after that build on Windows, because the installer
-picks up the DLLs from `target/release/` when packaging.
+On Windows the explicit build must still come first: the ANGLE DLL step reads
+the build output, and the installer picks the DLLs up from `target/release/`.
 
 Output lands in `target/release/`: `Paladin.app` and `Paladin_<version>_aarch64.dmg`
 on macOS, `paladin_<version>_x64-setup.exe` (NSIS, per-user install) on

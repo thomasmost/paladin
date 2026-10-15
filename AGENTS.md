@@ -40,12 +40,11 @@ Run from the repo root:
 - `cargo xtask icons` — regenerate `assets/icons/` from `assets/logo.svg`.
 - `cargo xtask angle-dlls [debug|release]` — Windows: copy `libEGL.dll` and
   `libGLESv2.dll` next to the executables after a build.
-- Packaging (see `README.md`): on Windows, `cargo xtask angle-dlls release`
-  after the release build (the installer's DLL resources come from this step),
-  then `cargo packager --release -p paladin`, which first runs
-  `cargo build --release -p paladin` (its `before-packaging-command`) and
-  produces the `.app`/`.dmg` (macOS) or NSIS installer (Windows) in
-  `target/release/`.
+- Packaging (see `README.md`): `cargo build --release -p paladin`, then on
+  Windows `cargo xtask angle-dlls release` (the installer's DLL resources come
+  from this step), then `cargo packager --release -p paladin`, which re-runs
+  the release build (its `before-packaging-command`) and produces the
+  `.app`/`.dmg` (macOS) or NSIS installer (Windows) in `target/release/`.
 
 ## Conventions
 

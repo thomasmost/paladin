@@ -2,8 +2,9 @@
 //! apps with no console, so stderr alone would hide them from the user.
 
 /// Writes `message` to stderr and, in Windows release builds, also shows it
-/// in a native message box titled "Paladin". Callers exit with their own
-/// failure code afterwards.
+/// in a native message box titled "Paladin". Most callers exit with their
+/// own failure code afterwards; a window that fails to open while others are
+/// still up is reported the same way and the app keeps running.
 pub fn report_fatal(message: &str) {
     eprintln!("{message}");
     #[cfg(all(windows, not(debug_assertions)))]
