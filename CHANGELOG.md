@@ -36,6 +36,10 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Changed
 
+- Servo and stylo are built from Paladin's forks (`thomasmost/servo`
+  `dist/paladin-0.7.0`, `thomasmost/stylo` `dist/paladin-0.22.0`) so the
+  browser can carry its own engine patches. No patches yet; the engine is
+  byte-for-byte upstream 0.7.0 / 0.22.0.
 - New logo artwork: the knight-on-pegasus illustration in `assets/logo.png`
   replaces the hand-drawn vector mark, framed by the same white rounded
   tile. All icon sizes are regenerated from it; the small ones are

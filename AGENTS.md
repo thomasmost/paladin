@@ -4,7 +4,7 @@ A desktop web browser for macOS and Windows. Servo renders pages, egui draws
 the chrome, winit owns the windows. Everything that touches Servo lives in one
 crate so the engine could be replaced without rewriting the model or the UI.
 
-_Last updated: 2026-10-15._
+_Last updated: 2026-10-15 (forks)._
 
 ## Architecture
 
@@ -51,16 +51,58 @@ Run from the repo root:
 
 - **Servo stays in `paladin-engine`.** The model and the UI only see
   `Command`, `EngineAction`, `EngineEvent`, `EngineInput`, and core ids.
+- **Servo and stylo come from Paladin's forks.** `thomasmost/servo` and
+  `thomasmost/stylo` each have a dev branch (`paladin/0.7.0`,
+  `paladin/0.22.0`) based on the upstream release tag that holds Paladin's
+  patch commits, and an append-only dist branch (`dist/paladin-0.7.0`,
+  `dist/paladin-0.22.0`) that `etc/paladin/publish-dist.sh` in each fork
+  builds from the dev branch with only the files a build needs. The root
+  `Cargo.toml` patches every crate of both repositories to the dist
+  branches; `Cargo.lock` pins the dist commit. Patches are one commit per
+  logical change in Servo's style (MPL header, `cargo fmt`, no
+  Paladin-specific names) so rebases stay mechanical. To publish a change:
+  commit on the dev branch, push it, run
+  `etc/paladin/publish-dist.sh dist/paladin-<version>` (prints the dist
+  sha), then in Paladin `cargo update -p servo --precise <sha>` (moves all
+  60 Servo crates) or `cargo update -p stylo --precise <sha>` (all 11 stylo
+  crates). Never rewrite a published dist branch: cargo fetches only that
+  branch, and a locked sha that disappears from it breaks every older
+  checkout.
+- **Local loop for fork changes.** Clone the forks to `~/vibes/servo` and
+  `~/vibes/stylo` (dev branches checked out) and put a `[patch.crates-io]`
+  table in `~/.cargo/config.toml` pointing at the checkout; config patches
+  override the manifest's for the same package. For Servo one entry is
+  enough (`servo = { path = "/Users/<you>/vibes/servo/components/servo" }`;
+  the other 59 are path dependencies of it and cargo warns that their
+  manifest patches are unused). For stylo list all eleven
+  (`stylo = { path = ".../stylo/style" }`, `stylo_atoms`
+  (`stylo_atoms`), `stylo_derive` (`style_derive`), `stylo_dom`
+  (`stylo_dom`), `stylo_malloc_size_of` (`malloc_size_of`),
+  `stylo_static_prefs` (`stylo_static_prefs`), `stylo_traits`
+  (`style_traits`), `selectors`, `servo_arc`, `to_shmem`,
+  `to_shmem_derive`), or the graph holds two copies of the siblings. The
+  first build from a path recompiles the whole repository; later edits
+  rebuild only the changed crates. The lock then records path sources: run
+  `git checkout Cargo.lock` before committing, and remove the config table
+  (or comment it out) to go back to the dist branches.
 - **Version pins move together.** `servo`, `winit`, `egui`, `egui-winit`,
   `egui_glow`, `glow`, and `surfman` are pinned to exact versions in the
   workspace `Cargo.toml` because they share a GL context and raw window
-  handles. To bump Servo: set `servo = "=<new>"` in
-  `crates/paladin-engine/Cargo.toml`, set the other pins to the versions in
-  that release's root `Cargo.toml` and `ports/servoshell/Cargo.toml`, set
-  `rust-toolchain.toml` to its channel, run `cargo update`, then pin any
-  pre-release crates to the versions in Servo's own `Cargo.lock` (0.7.0 needs
-  `cargo update -p pkcs1 --precise 0.8.0-rc.4`), rebuild, and run the manual
-  checklist in `README.md`.
+  handles. To bump Servo: in `~/vibes/servo`, `git fetch upstream --tags`,
+  branch `paladin/<new>` from the new tag, `git rebase --onto v<new>
+  v<old> paladin/<old>` the patch commits onto it (drop any upstream has
+  merged), do the same in `~/vibes/stylo` for the stylo version that
+  release's root `Cargo.toml` pins, publish both dist branches; in Paladin
+  set `servo = "=<new>"` in `crates/paladin-engine/Cargo.toml`, change the
+  `branch = ...` values in the root `[patch.crates-io]` table (and the
+  stylo crate list if the release's stylo workspace changed), set the
+  other pins to the versions in that release's root `Cargo.toml` and
+  `ports/servoshell/Cargo.toml`, set `rust-toolchain.toml` to its channel,
+  run `cargo update`, then pin any pre-release crates to the versions in
+  Servo's own `Cargo.lock` (0.7.0 needs
+  `cargo update -p pkcs1 --precise 0.8.0-rc.4`), rebuild, run the manual
+  checklist in `README.md`, and re-check the "Carried in the fork" entries
+  in `docs/upstream-issues.md`.
 - **One `Engine` per process.** Servo's options are process-global, so the
   engine test binary holds a single test function.
 - **The style-thread stack size is a build-time setting.** `.cargo/config.toml`
@@ -68,7 +110,8 @@ Run from the repo root:
   run from inside the repo; stylo reads it with `option_env!`, and its 512 KB
   default overflowed on wikipedia.org. Servo's own builds use the same value.
   Keep it when bumping Servo, and set it by hand if cargo runs from outside
-  the repo.
+  the repo. The same file sets `UV_NO_SYNC=1` so Servo's WebIDL codegen never
+  syncs a Python environment into a path-patched checkout.
 - **Every user action is a `Command`.** New chrome controls and shortcuts add
   a `Command` (and a `CommandKind` if it needs a hotkey), never a direct
   engine call.

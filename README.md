@@ -43,6 +43,11 @@ Xcode Command Line Tools on macOS, or Visual Studio Build Tools with the
 is downloaded prebuilt during the build, so no CMake, MozTools, or GStreamer
 is required.
 
+Servo and stylo are built from Paladin's forks (`thomasmost/servo`,
+`thomasmost/stylo`): the root `Cargo.toml` patches their crates to small
+`dist/*` branches that cargo fetches like any git dependency, so no extra
+setup is needed. `CLAUDE.md` describes how to work on the forks.
+
 1. **Build and run:** `cargo run` opens a window at the homepage. Pass URLs
    to open them as tabs, or `--profile <name>` to use another profile.
 2. **Windows only, before running:** `cargo xtask angle-dlls` copies

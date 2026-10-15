@@ -16,6 +16,10 @@ _State recorded as of 2026-10-15, against Servo 0.7.0, egui 0.34, winit 0.30._
   or search again.
 - On every Servo bump, re-check each `S` entry: the state, whether the
   workaround can go, and whether the dependent feature is now unblocked.
+- An issue fixed by a patch in Paladin's Servo or stylo fork moves to the
+  "Carried in the fork" section below with the patch commit's subject; on
+  every Servo bump re-check whether upstream has merged it and, if so, drop
+  the patch during the rebase and move the entry to "Resolved".
 - When an entry is resolved upstream and Paladin has picked the fix up, move
   it to the Resolved section rather than deleting it: the history explains
   workarounds that remain in the code.
@@ -276,6 +280,13 @@ Kept so nobody waits on upstream for them.
 - **Paladin's fix:** the packaging metadata lists no `formats` and relies on
   the per-host default (app and dmg on macOS, NSIS on Windows); see
   `CLAUDE.md`.
+
+## Carried in the fork
+
+Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
+(`paladin/0.22.0`), each listed against the upstream issue it addresses.
+
+None yet.
 
 ## Resolved
 
