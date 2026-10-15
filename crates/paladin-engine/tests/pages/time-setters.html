@@ -1,0 +1,62 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>time-setters</title>
+<div id="box" style="width:50px;height:50px;background:teal"></div>
+<script>
+let settled = false;
+const verdict = (title) => { if (!settled) { settled = true; document.title = title; } };
+const fail = (reason) => verdict('FAIL: ' + reason);
+addEventListener('error', (event) => fail(event.message));
+setTimeout(() => fail('did not settle within 5s'), 5000);
+
+(async () => {
+  const box = document.getElementById('box');
+  const keyframes = [{ opacity: 1 }, { opacity: 0 }];
+
+  // Setting currentTime on a pending animation holds the time until ready.
+  const anim = box.animate(keyframes, 1000);
+  anim.currentTime = 500;
+  if (anim.currentTime !== 500) return fail('currentTime after set is ' + anim.currentTime);
+
+  // A resolved current time may not be set to null.
+  let thrown = null;
+  try {
+    anim.currentTime = null;
+  } catch (e) {
+    thrown = e;
+  }
+  if (!(thrown instanceof TypeError)) return fail('currentTime = null threw ' + thrown);
+
+  // The animation resumes from the held time.
+  await anim.ready;
+  if (!(anim.currentTime >= 500 && anim.currentTime < 900)) {
+    return fail('currentTime after ready is ' + anim.currentTime);
+  }
+
+  // An idle animation has no current time, so null is allowed.
+  const idle = box.animate(keyframes, 1000);
+  idle.cancel();
+  try {
+    idle.currentTime = null;
+  } catch (e) {
+    return fail('currentTime = null on an idle animation threw ' + e.name);
+  }
+  if (idle.currentTime !== null) return fail('idle currentTime is ' + idle.currentTime);
+
+  // Setting startTime to null while paused keeps the current time.
+  anim.pause();
+  await anim.ready;
+  anim.currentTime = 300;
+  if (anim.playState !== 'paused') return fail('playState after seek is ' + anim.playState);
+  anim.startTime = null;
+  if (anim.startTime !== null) return fail('startTime after null is ' + anim.startTime);
+  if (anim.currentTime !== 300) return fail('currentTime after startTime = null is ' + anim.currentTime);
+
+  // Playing again gives the animation a resolved start time.
+  anim.play();
+  await anim.ready;
+  if (typeof anim.startTime !== 'number') return fail('startTime after play is ' + anim.startTime);
+  if (anim.playState !== 'running') return fail('playState after play is ' + anim.playState);
+  verdict('PASS');
+})().catch((e) => fail(e.message));
+</script>

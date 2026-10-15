@@ -25,7 +25,8 @@ setTimeout(() => fail('did not settle within 5s'), 5000);
   await anim.finished;
   if (anim.currentTime !== 0) return fail('currentTime after reversed finish is ' + anim.currentTime);
   if (anim.playbackRate !== -8) return fail('playbackRate after reverse is ' + anim.playbackRate);
-  // updatePlaybackRate() applies on the next frame without a jump.
+  // On a finished animation no play task is pending, so updatePlaybackRate()
+  // applies the rate at once and playbackRate reads back 1 straight away.
   anim.updatePlaybackRate(1);
   await anim.ready;
   if (anim.playbackRate !== 1) return fail('playbackRate after updatePlaybackRate is ' + anim.playbackRate);

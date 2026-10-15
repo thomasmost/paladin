@@ -1,0 +1,34 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>playback-event-constructor</title>
+<script>
+let settled = false;
+const verdict = (title) => { if (!settled) { settled = true; document.title = title; } };
+const fail = (reason) => verdict('FAIL: ' + reason);
+addEventListener('error', (event) => fail(event.message));
+setTimeout(() => fail('did not settle within 5s'), 5000);
+
+(() => {
+  const event = new AnimationPlaybackEvent('finish', { currentTime: 5, timelineTime: null });
+  if (!(event instanceof Event)) return fail('not an Event');
+  if (event.type !== 'finish') return fail('type is ' + event.type);
+  if (event.currentTime !== 5) return fail('currentTime is ' + event.currentTime);
+  if (event.timelineTime !== null) return fail('timelineTime is ' + event.timelineTime);
+  if (event.bubbles || event.cancelable) return fail('bubbles or cancelable is set');
+
+  // The members default to null.
+  const defaults = new AnimationPlaybackEvent('cancel');
+  if (defaults.type !== 'cancel') return fail('default type is ' + defaults.type);
+  if (defaults.currentTime !== null) return fail('default currentTime is ' + defaults.currentTime);
+  if (defaults.timelineTime !== null) return fail('default timelineTime is ' + defaults.timelineTime);
+
+  // A constructed event dispatches like any other.
+  const target = document.createElement('div');
+  let heard = null;
+  target.addEventListener('finish', (e) => { heard = e; });
+  target.dispatchEvent(event);
+  if (!(heard instanceof AnimationPlaybackEvent)) return fail('listener did not receive an AnimationPlaybackEvent');
+  if (heard.currentTime !== 5) return fail('dispatched currentTime is ' + heard.currentTime);
+  verdict('PASS');
+})();
+</script>

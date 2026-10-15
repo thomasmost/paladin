@@ -289,8 +289,12 @@ Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
 - **S13 (Web Animations API), partial.** `thomasmost/servo`
   `paladin/0.7.0`: "script: add the Web Animations timing calculations",
   "script: add AnimationPlaybackEvent", "script: implement the Animation
-  timing model", "script: finish Element.animate()". Timing model only;
-  sampling follows in later patches. Upstream: servo/servo#36950.
+  timing model", "script: finish Element.animate()", "script: request a
+  rendering update for queued animation events", "script: tick script
+  animations on their own timeline", "script: use expect for the unused
+  sequence number", "script: tidy the simple iteration progress check and
+  event queue note". Timing model only; sampling follows in later patches.
+  Upstream: servo/servo#36950.
 
 ## Resolved
 

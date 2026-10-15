@@ -4,7 +4,7 @@ A desktop web browser for macOS and Windows. Servo renders pages, egui draws
 the chrome, winit owns the windows. Everything that touches Servo lives in one
 crate so the engine could be replaced without rewriting the model or the UI.
 
-_Last updated: 2026-10-15 (forks)._
+_Last updated: 2026-10-15 (forks; two engine test binaries)._
 
 ## Architecture
 
@@ -33,8 +33,8 @@ Run from the repo root:
 - `cargo run -- [--profile <name>] [<url>...]` — run the browser. The
   workspace sets `default-members = ["crates/paladin"]`, so plain `cargo
   build`/`cargo test` touch only the binary; pass `--workspace` for the rest.
-- `cargo test --workspace` — unit tests plus the headless engine test (slow
-  the first time: it builds Servo).
+- `cargo test --workspace` — unit tests plus the two engine test binaries,
+  `headless` and `web_animations` (slow the first time: it builds Servo).
 - `cargo clippy --workspace --all-targets -- -D warnings` — lint.
 - `cargo fmt --all` — format; CI runs `cargo fmt --all --check`.
 - `cargo xtask icons` — regenerate `assets/icons/` from `assets/logo.svg`
@@ -106,8 +106,9 @@ Run from the repo root:
   `cargo update -p pkcs1 --precise 0.8.0-rc.4`), rebuild, run the manual
   checklist in `README.md`, and re-check the "Carried in the fork" entries
   in `docs/upstream-issues.md`.
-- **One `Engine` per process.** Servo's options are process-global, so the
-  engine test binary holds a single test function.
+- **One `Engine` per process.** Servo's options are process-global, so each
+  engine test binary (`headless`, `web_animations`) holds a single test
+  function that builds one engine.
 - **The style-thread stack size is a build-time setting.** `.cargo/config.toml`
   exports `SERVO_STYLE_THREAD_STACK_SIZE_KB=8192` to every cargo invocation
   run from inside the repo; stylo reads it with `option_env!`, and its 512 KB
