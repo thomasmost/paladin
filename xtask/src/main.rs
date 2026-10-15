@@ -82,11 +82,12 @@ fn icons(root: &Path) -> Result<()> {
         ..usvg::Options::default()
     };
     let tree = usvg::Tree::from_data(&svg_data, &options)?;
-    // usvg drops an <image> whose file is missing or unreadable with only a
-    // log warning, which would leave an empty tile in every icon.
+    // usvg drops an <image> whose file is missing or not a recognised
+    // format with only a log warning, which would leave an empty tile in
+    // every icon.
     if !contains_image(tree.root()) {
         return Err(format!(
-            "{} has no loaded <image>: check that assets/logo.png exists and is a PNG",
+            "{} has no loaded <image>: check that assets/logo.png exists",
             svg_path.display()
         )
         .into());
@@ -101,6 +102,12 @@ fn icons(root: &Path) -> Result<()> {
     // area averaging over the 1024 px render can. Sizes that do not divide
     // 1024 (24, 48) weight the partly covered source pixels.
     let largest = render(&tree, LARGEST_SIZE)?;
+    // A PNG that usvg accepted by its header but resvg could not decode
+    // also draws nothing; the artwork is black ink, so an all-light interior
+    // means it did not render.
+    if !has_dark_interior(&largest) {
+        return Err("the artwork did not render: assets/logo.png may be corrupt".into());
+    }
     let mut pngs: BTreeMap<u32, Vec<u8>> = BTreeMap::new();
     for size in PNG_SIZES.iter().chain(ICO_SIZES.iter()).copied() {
         if let std::collections::btree_map::Entry::Vacant(entry) = pngs.entry(size) {
@@ -252,6 +259,21 @@ fn downsample(source: &tiny_skia::Pixmap, size: u32) -> Result<tiny_skia::Pixmap
     Ok(out)
 }
 
+/// Whether any pixel in the middle half of the pixmap (well inside the
+/// tile's border) is dark: red below 128 at full alpha, in premultiplied
+/// terms. The artwork is black ink on white, so this is what "rendered"
+/// looks like.
+fn has_dark_interior(pixmap: &tiny_skia::Pixmap) -> bool {
+    let (w, h) = (pixmap.width() as usize, pixmap.height() as usize);
+    let data = pixmap.data();
+    (h / 4..h * 3 / 4).any(|y| {
+        (w / 4..w * 3 / 4).any(|x| {
+            let i = (y * w + x) * 4;
+            data[i + 3] == 255 && data[i] < 128
+        })
+    })
+}
+
 /// Whether the group or any group below it holds a loaded `<image>`.
 fn contains_image(group: &usvg::Group) -> bool {
     group.children().iter().any(|node| match node {
@@ -328,16 +350,49 @@ mod tests {
     }
 
     #[test]
+    fn dark_interior_ignores_the_border_and_needs_ink() {
+        let mut tile = filled(64, [255, 255, 255, 255]);
+        // A black border ring must not count.
+        for px in tile.data_mut()[..64 * 4].chunks_exact_mut(4) {
+            px.copy_from_slice(&[0, 0, 0, 255]);
+        }
+        assert!(!has_dark_interior(&tile));
+        // One black pixel in the middle does.
+        let centre = (32 * 64 + 32) * 4;
+        tile.data_mut()[centre..centre + 4].copy_from_slice(&[0, 0, 0, 255]);
+        assert!(has_dark_interior(&tile));
+        // Transparent pixels never count.
+        assert!(!has_dark_interior(&filled(16, [0, 0, 0, 0])));
+    }
+
+    /// A temp directory removed on drop, so a failing test leaves nothing.
+    struct TempDir(PathBuf);
+
+    impl TempDir {
+        fn new(label: &str) -> Self {
+            let dir =
+                std::env::temp_dir().join(format!("paladin-xtask-{label}-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            Self(dir)
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
     fn contains_image_sees_a_loaded_image_and_not_a_missing_one() {
-        let dir = std::env::temp_dir().join(format!("paladin-xtask-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
+        let dir = TempDir::new("image");
         std::fs::write(
-            dir.join("art.png"),
+            dir.0.join("art.png"),
             filled(2, [0, 0, 0, 255]).encode_png().unwrap(),
         )
         .unwrap();
         let options = usvg::Options {
-            resources_dir: Some(dir.clone()),
+            resources_dir: Some(dir.0.clone()),
             ..usvg::Options::default()
         };
         let svg = |href: &str| {
@@ -356,6 +411,5 @@ mod tests {
         )
         .unwrap();
         assert!(!contains_image(no_image.root()));
-        std::fs::remove_dir_all(&dir).unwrap();
     }
 }
