@@ -1,0 +1,89 @@
+# Paladin
+
+A desktop web browser for macOS and Windows. Servo renders pages, egui draws
+the chrome, winit owns the windows. Everything that touches Servo lives in one
+crate so the engine could be replaced without rewriting the model or the UI.
+
+_Last updated: 2026-10-14._
+
+## Architecture
+
+Cargo workspace (Rust 1.97.1 pinned in `rust-toolchain.toml`, edition 2024).
+
+| Crate                   | What it is |
+| ----------------------- | ---------- |
+| `crates/paladin-core`   | `paladin-core` — the Servo-free model: `Browser`/`Window`/`Tab`, `Command` and `dispatch`, `EngineEvent` and `apply`, `Keymap`, `Settings` (TOML), `Profile` paths. Depends on neither servo, egui, nor winit. |
+| `crates/paladin-engine` | `paladin-engine` — the only crate that imports `servo`. `Engine` (one per process), `GlSurface` (a window's GL context), `TabHost` (the tabs of one window, painted offscreen), `DelegateState` (Servo callbacks → `EngineEvent`). |
+| `crates/paladin`        | `paladin` — the binary: winit `App`, `BrowserWindow` (egui chrome over the tab host), `SettingsWindow`, winit-to-engine input mapping, icons, cargo-packager metadata. |
+| `xtask`                 | `cargo xtask icons` (logo → icns/ico/png) and `cargo xtask angle-dlls` (Windows ANGLE DLLs next to the binaries). |
+
+Data flow: the chrome and the keymap emit `Command`s; `paladin_core::dispatch`
+updates the model and returns `EngineAction`s, which the app forwards to the
+window's `TabHost` or handles itself (open and close windows, settings, quit).
+Servo callbacks become `EngineEvent`s that `paladin_core::apply` folds into the
+model. Both functions are pure and unit-tested; core ids never meet Servo ids
+outside `paladin-engine`.
+
+Local setup is in `README.md`.
+
+## Commands
+
+Run from the repo root:
+
+- `cargo run -- [--profile <name>] [<url>...]` — run the browser.
+- `cargo test --workspace` — unit tests plus the headless engine test (slow
+  the first time: it builds Servo).
+- `cargo clippy --workspace --all-targets -- -D warnings` — lint.
+- `cargo fmt --all` — format; CI runs `cargo fmt --all --check`.
+- `cargo xtask icons` — regenerate `assets/icons/` from `assets/logo.svg`.
+- `cargo xtask angle-dlls [debug|release]` — Windows: copy `libEGL.dll` and
+  `libGLESv2.dll` next to the executables after a build.
+- `cargo build --release && cargo packager --release -p paladin` — build the
+  `.app`/`.dmg` (macOS) or NSIS installer (Windows) into `target/release/`.
+
+## Conventions
+
+- **Servo stays in `paladin-engine`.** The model and the UI only see
+  `Command`, `EngineAction`, `EngineEvent`, `EngineInput`, and core ids.
+- **Version pins move together.** `servo`, `winit`, `egui`, `egui-winit`,
+  `egui_glow`, `glow`, and `surfman` are pinned to exact versions in the
+  workspace `Cargo.toml` because they share a GL context and raw window
+  handles. To bump Servo: set `servo = "=<new>"` in
+  `crates/paladin-engine/Cargo.toml`, set the other pins to the versions in
+  that release's root `Cargo.toml` and `ports/servoshell/Cargo.toml`, set
+  `rust-toolchain.toml` to its channel, run `cargo update`, then pin any
+  pre-release crates to the versions in Servo's own `Cargo.lock` (0.7.0 needs
+  `cargo update -p pkcs1 --precise 0.8.0-rc.4`), rebuild, and run the manual
+  checklist in `README.md`.
+- **One `Engine` per process.** Servo's options are process-global, so the
+  engine test binary holds a single test function.
+- **Every user action is a `Command`.** New chrome controls and shortcuts add
+  a `Command` (and a `CommandKind` if it needs a hotkey), never a direct
+  engine call.
+- **Generated icons are committed.** Edit `assets/logo.svg`, run
+  `cargo xtask icons`, commit the result. Never hand-edit `assets/icons/`.
+- **Format before every commit:** `cargo fmt --all`. CI fails on formatting
+  or clippy warnings.
+- **`AGENTS.md` mirrors this file.** Keep them identical.
+
+## Definition of Done
+
+A task is complete only when:
+
+1. **All tests pass** — `cargo test --workspace` is green, and the manual
+   checklist in `README.md` passes on macOS for any change to the chrome,
+   input handling, or engine glue.
+2. **All checks pass** — `cargo fmt --all --check`,
+   `cargo clippy --workspace --all-targets -- -D warnings`, and
+   `cargo build --workspace` are clean, and `cargo xtask icons` leaves
+   `assets/icons/` unchanged.
+3. **Docs are current** — `CHANGELOG.md` has an entry under `Unreleased` for
+   any user-visible change, and this file's freshness stamp is updated when
+   the architecture or commands change.
+
+## Workflow
+
+- Don't create a new branch unless specifically asked. Commit to the current branch.
+- Commit messages follow Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `ci:`).
+- Design plans live in `docs/design-plans/`; implementation plans in
+  `docs/implementation-plans/`; the phase roadmap is `ROADMAP.md`.
