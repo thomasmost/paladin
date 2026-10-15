@@ -89,6 +89,8 @@ jobs:
   package:
     name: package ${{ matrix.os }}
     needs: check
+    # Packaging runs on pushes to main only, as the README says.
+    if: github.event_name == 'push'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 180
     strategy:
