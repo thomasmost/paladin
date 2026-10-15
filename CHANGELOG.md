@@ -12,3 +12,6 @@ releases yet; `Unreleased` holds everything on `main`.
   binary, and an `xtask` helper, with project conventions (README, CHANGELOG,
   CLAUDE.md, ROADMAP), the knight-on-pegasus logo with generated icons, and CI
   on macOS and Windows.
+- Servo-free core model: windows and tabs, named commands with a pure
+  `dispatch`, engine events with a pure `apply`, a keymap with macOS and
+  Windows defaults, TOML settings, and per-OS profile directories.
