@@ -262,7 +262,7 @@ Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
 - **Web Animations API (was S13).** Upstream servo/servo#36950 and #44174:
   Servo 0.7.0 ships the API behind `dom_web_animations_enabled` with the
   playback and sampling halves unimplemented. Carried as `thomasmost/servo`
-  `paladin/0.7.0` (15 patch commits, oldest first): "script: add the Web
+  `paladin/0.7.0` (16 patch commits, oldest first): "script: add the Web
   Animations timing calculations", "script: add AnimationPlaybackEvent",
   "script: implement the Animation timing model", "script: finish
   Element.animate()", "script: request a rendering update for queued
@@ -275,13 +275,18 @@ Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
   animations through stylo", "script: resample when an animation's effect,
   target or time changes", "script: resample after a playback rate change
   and correct the unrendered-target note", "script: implement
-  Element.getAnimations() and Document.getAnimations()"; and
+  Element.getAnimations() and Document.getAnimations()", "script: document
+  the scope of getAnimations()"; and
   `thomasmost/stylo` `paladin/0.22.0` (2 patch commits, oldest first):
   "Add script-driven animations to ElementAnimationSet", "Test equal-offset
   script keyframes and the cancel dirty flag". Paladin enables the pref in
   `Engine`. Not covered: `CSSAnimation`/`CSSTransition` objects,
   `commitStyles`, `persist`, replace-state removal, pseudo-element targets,
-  shadow-root `getAnimations`. On each Servo bump check whether upstream has
+  shadow-root `getAnimations`. Animations whose timeline's document differs
+  from their target's document (same-origin iframes, targets adopted into
+  another document) and animations on a null timeline are not returned by
+  `getAnimations()`, because the registry is per timeline document. On each
+  Servo bump check whether upstream has
   landed any of #36950's follow-ups and drop the overlapping patches.
   Known gaps in this patch set, for a later phase to pick up:
   - **Replaced animations are never removed.** "Remove replaced animations"

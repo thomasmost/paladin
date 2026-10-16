@@ -15,7 +15,7 @@ releases yet; `Unreleased` holds everything on `main`.
   `KeyframeEffect` options, property-indexed keyframes and
   `getComputedTiming()`, and `getAnimations()` on elements and the
   document. Script animations are sampled by the style system each frame
-  like CSS animations, so bsky.app renders past its splash screen.
+  like CSS animations.
   Implemented as patches carried in Paladin's Servo and stylo forks.
 - Cargo workspace with a Servo-free core crate, an engine crate, the `paladin`
   binary, and an `xtask` helper, with project conventions (README, CHANGELOG,
