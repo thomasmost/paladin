@@ -68,7 +68,12 @@ const check = (condition, what) => { if (!condition) throw new Error(what); };
   // Retargeting moves the animation from the old target's list to the new one.
   const a6 = box.animate([{ opacity: 1 }, { opacity: 0 }], 10000);
   check(same(box.getAnimations(), [a3, a6]), 'animation before retargeting');
+  // The effect target is read live, so the lists change at once, before any
+  // frame: an implementation that updated them only on a tick would fail here.
   a6.effect.target = other;
+  check(same(box.getAnimations(), [a3]), 'retargeted animation still listed by the old target before a frame');
+  check(same(other.getAnimations(), [a4, a6]), 'retargeted animation missing from the new target before a frame');
+  check(same(document.getAnimations(), [a2, a3, a4, a6]), 'retargeted animation missing from the document before a frame');
   await frame();
   check(same(box.getAnimations(), [a3]), 'retargeted animation still listed by the old target');
   check(same(other.getAnimations(), [a4, a6]), 'retargeted animation missing from the new target');
