@@ -155,8 +155,13 @@ Output lands in `target/release/`: `Paladin.app` and `Paladin_<version>_aarch64.
 on macOS, `paladin_<version>_x64-setup.exe` (NSIS, per-user install) on
 Windows. The bundles are unsigned. CI builds both on every push to `main` and
 uploads them as workflow artifacts named `paladin-macos-15` and
-`paladin-windows-2025`. Release builds on Windows are GUI-subsystem apps with
-no console window, so they print no logs; debug builds keep the console.
+`paladin-windows-2025`, together with the symbol file for that build
+(`paladin.pdb` on Windows, `paladin.dSYM` on macOS; the release profile keeps
+line tables). Release builds on Windows are GUI-subsystem apps with no console
+window, so they print no logs; debug builds keep the console. A release
+build still writes its log to a redirected stderr, and a crash can be
+caught with `cdb -g -G paladin.exe <url>` (set `_NO_DEBUG_HEAP=1` first) and
+symbolized with the PDB of the same build.
 
 ### Windows prerequisites
 

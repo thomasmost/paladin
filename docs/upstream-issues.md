@@ -46,8 +46,12 @@ or starts with the workaround noted in the entry.
     [T1](#t1-__eh_frame-section-too-large-linker-warning-on-macos).
   - Style-thread stack overflow on wikipedia.org: resolved by
     [S5](#s5-style-threads-overflow-their-512-kb-stack-resolved-in-paladin).
+  - Windows release builds crash on wikipedia.org (the `<select>` value
+    setter): [Carried in the fork: select value setter](#carried-in-the-fork).
   - Packaging on both hosts: worked around in
     [T2](#t2-cargo-packager-0118-fails-on-formats-the-host-cannot-build).
+  - Debug build links on Windows: worked around in
+    [T3](#t3-the-debug-script-rlib-exceeds-4-gb-on-windows).
   - IME composition in page text fields: not upstream after all; see
     [Checked and not upstream](#checked-and-not-upstream).
 - **Phase 2 (hotkeys, profiles, tab moves)**
@@ -254,6 +258,21 @@ Kept so nobody waits on upstream for them.
   the per-host default (app and dmg on macOS, NSIS on Windows); see
   `CLAUDE.md`.
 
+### T3: The debug `script` rlib exceeds 4 GB on Windows
+
+- **Upstream:** [rust-lang/rust#151184][151184] (open). An rlib over 4 GB
+  gets a broken archive index on Windows; `link.exe` then reports hundreds
+  of `unresolved external symbol` errors from that crate (`LNK1120`).
+- **What it was:** `cargo build --workspace --all-targets` on Windows
+  linked the debug `paladin.exe` against a 4.45 GB
+  `libscript-*.rlib` and failed with 983 unresolved externals. Servo's
+  workspace avoids it with `[profile.dev.package.servo-script]
+  codegen-units = 16` in its root `Cargo.toml`, which does not apply to a
+  workspace that depends on Servo.
+- **Paladin's workaround:** the same override in the root `Cargo.toml`.
+  Drop it when the rustc issue is fixed.
+- **Blocks:** nothing.
+
 ## Carried in the fork
 
 Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
@@ -348,6 +367,34 @@ Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
     `getComputedStyle` read still sees the previous tick (see "Sampling is
     per tick"). The script side has no hook for display changes.
 
+- **`<select>` value setter reads the wrong node.** Upstream
+  [servo/servo#48109][48109] ("servoshell release build segfaults
+  (0xC0000005) on Wikipedia"), open, with Paladin's analysis in the
+  comments. In a Windows x86_64 release build without LTO (rustc 1.97.1,
+  Servo 0.7.0), `HTMLSelectElement::SetValue` calls
+  `HTMLOptionElement::Value` on each option's *next sibling* instead of the
+  option: the inlined `list_of_options` (`children_unrooted` + `flat_map` +
+  `Choice3` + `iter::once`) loads the sibling before the type check and
+  keeps that register as the item. When the sibling is a whitespace text
+  node the read of `Element::attrs` through it is an access violation and
+  the process dies; when it is the next option the assignment silently does
+  nothing. The `value` getter and `selectedIndex` setter inline the same
+  iterator and are compiled correctly, and a standalone program with the
+  same shape is also correct, so whether this is an LLVM bug or UB in the
+  `UnrootedDom`/`NoGC` path is unknown. wikipedia.org sets
+  `searchLanguage.value` on DOMContentLoaded, which is why it crashed on
+  Windows a few seconds after load; macOS builds were not tested for it.
+  Carried as `thomasmost/servo` `paladin/0.7.0` "script: iterate a select's
+  options without flat_map", which replaces the adapter chain with a
+  hand-written iterator. Reproduce with a page holding a `<select>` with two
+  options on separate lines and `s.value = 'b'` on DOMContentLoaded. On each
+  Servo bump re-test that page on Windows before dropping the patch, even
+  if upstream has rewritten `list_of_options`. Building with Servo's
+  `production` profile settings (`lto = true`, `codegen-units = 1`,
+  `opt-level = "s"`) also hides the bug on the unpatched 0.7.0 (a 105 MB
+  instead of 142 MB binary, 30 minutes instead of 12 to build on a 16-core
+  desktop); Paladin keeps the plain release profile and the patch.
+
 ## Resolved
 
 Entries move here once upstream has shipped the fix and Paladin has picked
@@ -364,4 +411,6 @@ it up. None yet.
 [46562]: https://github.com/servo/servo/issues/46562
 [47126]: https://github.com/servo/servo/issues/47126
 [47370]: https://github.com/servo/servo/issues/47370
+[48109]: https://github.com/servo/servo/issues/48109
 [159105]: https://github.com/rust-lang/rust/issues/159105
+[151184]: https://github.com/rust-lang/rust/issues/151184

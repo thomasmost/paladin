@@ -28,6 +28,20 @@ url = { version = "2.5", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 log = "0.4"
 
+[profile.release]
+# Line tables only: enough to symbolize a crash dump or a cdb stack from the
+# PDB (Windows) or dSYM (macOS) that CI uploads next to the installer, without
+# changing the generated code. Neither file ships in the installer.
+debug = "line-tables-only"
+
+[profile.dev.package.servo-script]
+# Servo's own workspace sets this too: with the default 256 codegen units
+# the debug rlib of the script crate passes 4 GB on Windows, the archive
+# index wraps, and the final link fails with hundreds of unresolved
+# externals (rust-lang/rust#151184; docs/upstream-issues.md T3). Profile
+# overrides in a dependency's workspace do not apply here, so repeat it.
+codegen-units = 16
+
 # Servo and stylo build from Paladin's forks so the browser can carry its own
 # patches. The dist branches hold only the files a build needs; the dev
 # branches (paladin/<version>) hold the patch commits. The fork manifests

@@ -166,10 +166,16 @@ jobs:
       # executable bits in a zipped artifact, and the .dmg contains it.
       - run: cargo packager --release -p paladin
 
+      # The symbol file (PDB on Windows, dSYM on macOS) from the release
+      # profile's line tables is uploaded next to the installer so a crash in
+      # an installed build can be symbolized (the wikipedia.org crash in
+      # docs/upstream-issues.md needed one). It is not part of the installer.
       - uses: actions/upload-artifact@v7
         with:
           name: paladin-${{ matrix.os }}
           path: |
             target/release/*.dmg
             target/release/*-setup.exe
+            target/release/paladin.pdb
+            target/release/paladin.dSYM
           if-no-files-found: error

@@ -4,7 +4,7 @@ A desktop web browser for macOS and Windows. Servo renders pages, egui draws
 the chrome, winit owns the windows. Everything that touches Servo lives in one
 crate so the engine could be replaced without rewriting the model or the UI.
 
-_Last updated: 2026-10-15 (forks, Web Animations)._
+_Last updated: 2026-10-16 (release symbols)._
 
 ## Architecture
 
@@ -46,6 +46,9 @@ Run from the repo root:
   from this step), then `cargo packager --release -p paladin`, which re-runs
   the release build (its `before-packaging-command`) and produces the
   `.app`/`.dmg` (macOS) or NSIS installer (Windows) in `target/release/`.
+  The release profile keeps line tables (`debug = "line-tables-only"`), so
+  the build also leaves `paladin.pdb` (Windows) or `paladin.dSYM` (macOS)
+  there; CI uploads it with the installer and it stays out of the bundle.
 
 ## Conventions
 
@@ -136,6 +139,11 @@ Run from the repo root:
   Keep it when bumping Servo, and set it by hand if cargo runs from outside
   the repo. The same file sets `UV_NO_SYNC=1` so Servo's WebIDL codegen never
   syncs a Python environment into a path-patched checkout.
+- **The debug `script` crate builds with 16 codegen units.** The root
+  `Cargo.toml` sets `[profile.dev.package.servo-script] codegen-units = 16`
+  because the default 256 push its debug rlib past 4 GB on Windows and the
+  link fails (`docs/upstream-issues.md` T3). Keep it on every Servo bump
+  until the rustc issue is fixed.
 - **Every user action is a `Command`.** New chrome controls and shortcuts add
   a `Command` (and a `CommandKind` if it needs a hotkey), never a direct
   engine call.

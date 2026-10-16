@@ -56,6 +56,16 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Fixed
 
+- Windows: wikipedia.org (and any page that assigns `select.value`) no
+  longer crashes the browser. Servo's `HTMLSelectElement.value` setter was
+  compiled to read each option's next sibling in Windows release builds
+  (servo/servo#48109); the option iterator is rewritten in Paladin's Servo
+  fork. Release builds now carry line tables, and CI uploads the PDB or
+  dSYM next to the installer so a crash in an installed build can be
+  symbolized.
+- Windows: the debug build of the workspace links again. The `script`
+  crate's debug rlib had grown past 4 GB (rust-lang/rust#151184); it is
+  now built with 16 codegen units, as in Servo's own workspace.
 - Address bar: `localhost/path` and bare IPv4 addresses such as
   `192.168.1.1:8080` now parse, `localhostfoo.com` gets `https://`, and
   `javascript:` URLs are refused. Releasing one mouse button no longer ends
