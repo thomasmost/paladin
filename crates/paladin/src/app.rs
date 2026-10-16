@@ -363,6 +363,11 @@ impl ApplicationHandler<AppEvent> for App {
                     return;
                 }
             }
+            log::info!(
+                "profile {:?} at {}",
+                self.browser.profile.name,
+                self.browser.profile.dir.display()
+            );
             icon::set_dock_icon();
             let actions = std::mem::take(&mut self.pending_actions);
             self.perform_all(actions, event_loop);

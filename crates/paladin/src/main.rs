@@ -37,7 +37,14 @@ struct Cli {
 }
 
 fn main() -> ExitCode {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    // The engine installs the process logger when it starts (Servo's, which
+    // also feeds its crash reporting; see `paladin_engine::Engine::new`), so
+    // nothing is logged before then. It reads `RUST_LOG`; default it to
+    // `info` like the former `env_logger` setup did.
+    if std::env::var_os("RUST_LOG").is_none() {
+        // SAFETY: the first thing `main` does, before any other thread exists.
+        unsafe { std::env::set_var("RUST_LOG", "info") };
+    }
     let cli = Cli::parse();
 
     let profile = match Profile::resolve(&cli.profile) {
@@ -64,8 +71,6 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    log::info!("profile {:?} at {}", profile.name, profile.dir.display());
-
     let mut urls = Vec::new();
     for arg in &cli.urls {
         match chrome::location_input_to_url(arg) {

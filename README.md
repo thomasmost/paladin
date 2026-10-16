@@ -90,15 +90,23 @@ or engine glue. Each item must pass.
    is always present and reloads the current page; while a page loads, a
    disabled Stop button appears beside it whose tooltip explains that Servo
    cannot stop a load.
-4. **Tabs.** "+" opens a new tab and activates it; clicking a tab title
-   switches tabs and the address bar follows; "×" and middle-click close a
-   tab and the neighbour to the right becomes active; closing the last tab
-   closes the window and the process exits.
-5. **Resize and HiDPI.** Resize the window: the page stays aligned under the
+4. **Tabs.** "+" or Cmd+T (Ctrl+T on Windows) opens a new tab, activates
+   it, and puts the keyboard focus in the address bar with its text
+   selected, so typing a URL and pressing Enter loads it in the new tab;
+   clicking a tab title switches tabs and the address bar follows; "×" and
+   middle-click close a tab and the neighbour to the right becomes active;
+   closing the last tab closes the window and the process exits.
+5. **Crashed tab.** A page whose script thread panics (a Servo bug, not
+   something a page can do on purpose) shows the tab's error panel with the
+   panic message, the other tabs keep working, and the terminal shows
+   `tab crashed: <reason>`; Back, Forward, and Reload clear the panel. A
+   native crash (an access violation) still ends the process: Servo runs
+   every tab in this one process on Windows and macOS.
+6. **Resize and HiDPI.** Resize the window: the page stays aligned under the
    toolbar with no gap or stretching. Drag the window to a display with a
    different scale factor (or change the display scaling): text stays sharp
    and clicks land where expected.
-6. **Input.** Scrolling with the wheel or trackpad over the page scrolls it;
+7. **Input.** Scrolling with the wheel or trackpad over the page scrolls it;
    clicking a text field on a page and typing enters text; typing in the
    address bar does not reach the page. Hovering a link shows its URL in the
    status overlay at the bottom left without the page moving. Drag-select
@@ -106,14 +114,14 @@ or engine glue. Each item must pass.
    pointer back over the page: the selection does not keep growing. Press
    in the address bar, release over the page, then move over the page: the
    address bar's selection does not keep growing either.
-7. **Exit.** Closing the window exits with no Servo error output on the
+8. **Exit.** Closing the window exits with no Servo error output on the
    terminal. Quitting from the Dock menu does the same.
-8. **Windows and menu.** Cmd+N (Ctrl+N on Windows), or New window chosen
+9. **Windows and menu.** Cmd+N (Ctrl+N on Windows), or New window chosen
    with the mouse from the "☰" menu, opens a second window; each window's
    tabs, address bar, and page are independent, and closing one leaves the
    other working. Clicking on the page outside an open menu closes the menu
    without the click reaching the page.
-9. **Shortcuts.** With Cmd on macOS or Ctrl on Windows: T new tab, W close
+10. **Shortcuts.** With Cmd on macOS or Ctrl on Windows: T new tab, W close
    tab, Shift+W close window, N new window, L focus the address bar with
    its text selected, R reload, period Stop (only logs a warning: Servo 0.7.0
    cannot stop a load), Shift+] and Shift+[ next and
@@ -122,16 +130,16 @@ or engine glue. Each item must pass.
    chord held down fires once, and none of its key strokes reach the page.
    Shortcuts also work while the address bar has focus. Escape and
    Cmd+Left/Right are not shortcuts and do reach the page.
-10. **Settings.** Settings (Cmd+, or chosen with the mouse from the menu)
+11. **Settings.** Settings (Cmd+, or chosen with the mouse from the menu)
     opens a window with Homepage, New tab URL, and the restore checkbox.
     Edits are saved when a field loses focus or the window closes;
     relaunching opens the new homepage, and `settings.toml` in the profile
     directory holds it. With the settings window focused, Cmd+W closes it
     and Cmd+Q quits.
-11. **Clean exit.** Closing the last window, Cmd+Q from a browser window or
+12. **Clean exit.** Closing the last window, Cmd+Q from a browser window or
     from the settings window, and Quit from the Dock menu (macOS) all exit
     with code 0 and no Servo error output.
-12. **Web Animations.** Open `https://bsky.app`: the blue splash screen fades
+13. **Web Animations.** Open `https://bsky.app`: the blue splash screen fades
     out and the landing page or feed renders and scrolls. (Script animations
     are sampled by Paladin's Servo and stylo forks; see
     `docs/upstream-issues.md`, "Carried in the fork".)

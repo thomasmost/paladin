@@ -45,6 +45,13 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Changed
 
+- A new tab opened with "+" or the New tab shortcut puts the keyboard focus
+  in the address bar with its text selected; tabs opened on a URL (popups)
+  leave the focus on the page.
+- Logging is set up by the engine when Servo starts (`RUST_LOG`, default
+  `info`) instead of by the binary at launch, because Servo's crash
+  reporting rides on its logger.
+
 - Servo and stylo are built from Paladin's forks (`thomasmost/servo`
   `dist/paladin-0.7.0`, `thomasmost/stylo` `dist/paladin-0.22.0`) so the
   browser can carry its own engine patches.
@@ -56,6 +63,14 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Fixed
 
+- A panic on one tab's script thread no longer ends the whole browser. Servo
+  was started in its test-runner "hard fail" mode, which exits the process on
+  any script panic without a crash report, and Paladin installed no panic
+  hook, so the engine never heard of the panic. Now the crashed tab shows
+  its error panel with the panic message (and `tab crashed: <reason>` on
+  stderr) while the other tabs keep running. A native crash (an access
+  violation) still takes the process down: Servo runs every tab in the
+  one process on Windows and macOS.
 - Windows: wikipedia.org (and any page that assigns `select.value`) no
   longer crashes the browser. Servo's `HTMLSelectElement.value` setter was
   compiled to read each option's next sibling in Windows release builds

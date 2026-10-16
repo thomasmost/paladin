@@ -147,6 +147,16 @@ Run from the repo root:
 - **Every user action is a `Command`.** New chrome controls and shortcuts add
   a `Command` (and a `CommandKind` if it needs a hotkey), never a direct
   engine call.
+- **The engine owns the logger and the panic hook.** `Engine::new` installs
+  Servo's logger (`Servo::setup_logging`: `env_logger` plus a forwarder to
+  the constellation) and a panic hook that logs the panic message at error
+  level; an error logged on a panicking thread is how the constellation
+  learns a script thread died, closes that tab's pipelines, reports
+  `notify_crashed` (an `EngineEvent::TabCrashed`), and loads a crash page.
+  `Opts::hard_fail` stays `false` (Servo's default `true` exits the process
+  instead). Nothing else may initialise a logger: `log::set_boxed_logger`
+  is once per process and the engine's call would panic. `main` only
+  defaults `RUST_LOG` to `info`.
 - **Key routing has one rule.** It lives in `input::route_key` (Cmd/Ctrl
   chords fire even in the address bar; otherwise egui while focused, then
   bound chords on initial press, then the page). Browser windows apply it via

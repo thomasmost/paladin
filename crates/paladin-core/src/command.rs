@@ -168,6 +168,7 @@ fn new_tab(browser: &mut Browser, window: WindowId, url: Option<Url>) -> Vec<Eng
     if browser.window(window).is_none() {
         return Vec::new();
     }
+    let focus_address = url.is_none();
     let url = url.unwrap_or_else(|| browser.new_tab_url());
     let tab = browser.allocate_tab_id();
     let w = browser
@@ -176,10 +177,17 @@ fn new_tab(browser: &mut Browser, window: WindowId, url: Option<Url>) -> Vec<Eng
     let previous = w.active;
     w.tabs.push(Tab::new(tab, url.clone()));
     w.active = tab;
-    vec![
+    let mut actions = vec![
         EngineAction::Hide(previous),
         EngineAction::CreateTab { window, tab, url },
-    ]
+    ];
+    // A tab the user opened empty is there to type an address into; a tab
+    // opened on a URL (a popup, a link into a new tab) keeps the focus on
+    // the page.
+    if focus_address {
+        actions.push(EngineAction::FocusAddressBar(window));
+    }
+    actions
 }
 
 /// Remove `tab`. If it was active, the tab to its right becomes active, or
@@ -303,23 +311,33 @@ mod tests {
                     tab: second,
                     url: url("https://new.example/"),
                 },
+                EngineAction::FocusAddressBar(window),
             ]
         );
     }
 
     #[test]
-    fn new_tab_with_explicit_url_uses_it() {
-        let (mut b, window, _) = one_window();
-        dispatch(
+    fn new_tab_with_explicit_url_uses_it_and_leaves_focus_on_the_page() {
+        let (mut b, window, first) = one_window();
+        let actions = dispatch(
             &mut b,
             &Command::NewTab {
                 window,
                 url: Some(url("https://b.example/")),
             },
         );
+        let w = b.window(window).unwrap();
+        assert_eq!(w.active_tab().url.as_str(), "https://b.example/");
         assert_eq!(
-            b.window(window).unwrap().active_tab().url.as_str(),
-            "https://b.example/"
+            actions,
+            vec![
+                EngineAction::Hide(first),
+                EngineAction::CreateTab {
+                    window,
+                    tab: w.active,
+                    url: url("https://b.example/"),
+                },
+            ]
         );
     }
 

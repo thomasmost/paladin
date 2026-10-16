@@ -1,10 +1,10 @@
 //! Servo construction, the event-loop waker bridge, and the event queue.
 
 use std::fmt;
-use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::panic::{AssertUnwindSafe, PanicHookInfo, catch_unwind};
 use std::path::Path;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Once};
 
 use paladin_core::{EngineEvent, PendingTab};
 use servo::{EventLoopWaker, Opts, Preferences, Servo, ServoBuilder};
@@ -54,6 +54,7 @@ impl Engine {
     /// `servo_config_dir` (the profile's `servo/` directory).
     pub fn new(servo_config_dir: &Path, waker: Arc<dyn Waker>) -> Result<Engine, EngineError> {
         install_crypto_provider();
+        install_panic_hook();
         std::fs::create_dir_all(servo_config_dir).map_err(|e| {
             EngineError(format!(
                 "creating engine directory {}: {e}",
@@ -62,6 +63,13 @@ impl Engine {
         })?;
         let opts = Opts {
             config_dir: Some(servo_config_dir.to_path_buf()),
+            // Servo's default is `true`, meant for test runners: a panic on
+            // any script thread then exits the whole process with code 1 and
+            // no crash report. With `false` the constellation reports the
+            // panic to the delegate (`notify_crashed`, an
+            // `EngineEvent::TabCrashed`), closes that tab's pipeline, and
+            // replaces it with a crash page; the other tabs keep running.
+            hard_fail: false,
             ..Opts::default()
         };
         // Servo reports start-up failures by panicking. Turn that into an
@@ -80,9 +88,15 @@ impl Engine {
         .map_err(|payload| {
             EngineError(format!(
                 "Servo failed to start: {}",
-                panic_message(&payload)
+                panic_message(&*payload)
             ))
         })?;
+        // Servo's logger: an `env_logger` (filtered by `RUST_LOG`) plus a
+        // forwarder to the constellation, which turns an error logged while
+        // a thread is panicking into that thread's panic report (see
+        // `install_panic_hook`). It must be the process's only logger, so
+        // nothing else may initialise one.
+        servo.setup_logging();
         let delegate = Rc::new(DelegateState::default());
         servo.set_delegate(delegate.clone());
         Ok(Engine { servo, delegate })
@@ -124,13 +138,37 @@ impl Drop for Engine {
     }
 }
 
+/// Install the process panic hook Servo's crash reporting relies on, once.
+///
+/// The hook keeps the default one (the "thread X panicked at" message and,
+/// with `RUST_BACKTRACE`, the backtrace) and then logs the panic message at
+/// error level. Servo's logger (see `Servo::setup_logging`) records an
+/// error logged on a panicking thread as a panic entry, and the
+/// constellation then closes the pipelines of that script thread, reports
+/// the crash to the delegate (`notify_crashed`, an
+/// `EngineEvent::TabCrashed`), and loads a crash page in their place, so
+/// a panic in one tab's script thread does not take the others down.
+/// Panics on other threads unwind as before once the hook returns.
+fn install_panic_hook() {
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        let default_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info: &PanicHookInfo<'_>| {
+            default_hook(info);
+            if !servo::should_panic_hook_suppress_termination() {
+                log::error!("{}", panic_message(info.payload()));
+            }
+        }));
+    });
+}
+
 /// Servo's networking reads the process default rustls provider. Installing
 /// twice is an error, which is harmless here.
 fn install_crypto_provider() {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 }
 
-fn panic_message(payload: &Box<dyn std::any::Any + Send>) -> String {
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
     if let Some(s) = payload.downcast_ref::<&str>() {
         (*s).to_string()
     } else if let Some(s) = payload.downcast_ref::<String>() {

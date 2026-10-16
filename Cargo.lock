@@ -5172,7 +5172,6 @@ dependencies = [
  "egui",
  "egui-winit",
  "egui_glow",
- "env_logger",
  "keyboard-types",
  "log",
  "objc2 0.6.5",
