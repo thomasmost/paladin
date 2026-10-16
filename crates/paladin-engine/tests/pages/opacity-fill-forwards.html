@@ -1,0 +1,26 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>opacity-fill-forwards</title>
+<div id="box" style="width:50px;height:50px;background:teal"></div>
+<script>
+let settled = false;
+const verdict = (title) => { if (!settled) { settled = true; document.title = title; } };
+const fail = (reason) => verdict('FAIL: ' + reason);
+addEventListener('error', (event) => fail(event.message));
+setTimeout(() => fail('did not settle within 5s'), 5000);
+const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+const opacity = () => parseFloat(getComputedStyle(document.getElementById('box')).opacity);
+
+(async () => {
+  const box = document.getElementById('box');
+  if (opacity() !== 1) return fail('initial opacity is ' + opacity());
+  const anim = box.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 100, fill: 'forwards' });
+  await anim.finished;
+  await frame();
+  if (opacity() !== 0) return fail('opacity after finish with fill forwards is ' + opacity());
+  // The value holds: no further ticks are needed.
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  if (opacity() !== 0) return fail('opacity did not hold: ' + opacity());
+  verdict('PASS');
+})().catch((e) => fail(e.message));
+</script>

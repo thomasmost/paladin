@@ -296,14 +296,13 @@ Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
   event queue note", "script: clarify why the animation sequence number is
   unused", "script: complete KeyframeEffect construction", "script:
   propagate exceptions and follow the spec order when reading keyframe
-  properties". Timing model and
-  effect construction only; sampling follows in later patches.
+  properties", "script: sample script animations through stylo".
   Upstream: servo/servo#36950.
 - **S13 (Web Animations API), stylo half.** `thomasmost/stylo`
   `paladin/0.22.0`: "Add script-driven animations to ElementAnimationSet",
   "Test equal-offset script keyframes and the cancel dirty flag".
-  Keyframe resolution and sampling for script animations. No caller yet;
-  a later Servo-side patch pushes keyframes and progress into it.
+  Keyframe resolution and sampling for script animations. Its caller is
+  the Servo-side patch "script: sample script animations through stylo".
 
 ## Resolved
 

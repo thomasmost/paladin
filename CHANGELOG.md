@@ -12,7 +12,9 @@ releases yet; `Unreleased` holds everything on `main`.
   `Animation` implements the timing model (`play`, `pause`, `cancel`,
   `finish`, `reverse`, `playbackRate`, `updatePlaybackRate`, `currentTime`,
   `startTime`, `playState`, `pending`, `ready`, `finished`, `onfinish`,
-  `oncancel`). Animations do not change rendered style yet.
+  `oncancel`). Animations are sampled by the style system each frame like
+  CSS animations: `fill: forwards` holds the end value and `cancel()`
+  reverts the style.
   `KeyframeEffect` applies its timing options and `composite`, exposes
   `target`, accepts property-indexed keyframes and reports computed offsets
   from `getKeyframes()`; `getComputedTiming()` returns real values. Carried

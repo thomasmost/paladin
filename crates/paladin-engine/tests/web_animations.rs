@@ -38,6 +38,10 @@ const PAGES: &[&str] = &[
     "computed-timing.html",
     "keyframes-errors.html",
     "keyframes-order.html",
+    "opacity-fill-forwards.html",
+    "opacity-mid-animation.html",
+    "cancel-reverts.html",
+    "splash.html",
 ];
 
 /// How long one page may take to report; the first page also pays for

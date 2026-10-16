@@ -1,0 +1,42 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>splash</title>
+<style>
+  #splash { position: fixed; inset: 0; background: #1185fe; display: flex;
+            align-items: center; justify-content: center; color: white; }
+  #feed { display: none; }
+</style>
+<div id="splash">splash</div>
+<div id="feed">feed</div>
+<script>
+let settled = false;
+const verdict = (title) => { if (!settled) { settled = true; document.title = title; } };
+const fail = (reason) => verdict('FAIL: ' + reason);
+addEventListener('error', (event) => fail(event.message));
+setTimeout(() => fail('splash did not finish within 5s'), 5000);
+const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+
+(async () => {
+  const splash = document.getElementById('splash');
+  const feed = document.getElementById('feed');
+  const anim = splash.animate(
+    [{ opacity: 1, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(1.1)' }],
+    { duration: 300, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', fill: 'forwards' });
+  let sawProgress = false;
+  anim.onfinish = () => {
+    const style = getComputedStyle(splash);
+    if (parseFloat(style.opacity) !== 0) return fail('splash opacity at finish is ' + style.opacity);
+    if (!style.transform.includes('1.1')) return fail('splash transform at finish is ' + style.transform);
+    splash.remove();
+    feed.style.display = 'block';
+    if (getComputedStyle(feed).display !== 'block') return fail('feed is not shown');
+    if (!sawProgress) return fail('opacity never changed while animating');
+    verdict('PASS');
+  };
+  for (let i = 0; i < 30; i++) {
+    await frame();
+    const value = parseFloat(getComputedStyle(splash).opacity);
+    if (value > 0 && value < 1) { sawProgress = true; break; }
+  }
+})().catch((e) => fail(e.message));
+</script>
