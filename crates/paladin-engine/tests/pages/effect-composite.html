@@ -1,0 +1,29 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>effect-composite</title>
+<div id="box" style="width:50px;height:50px;background:teal;opacity:0.5"></div>
+<script>
+let settled = false;
+const verdict = (title) => { if (!settled) { settled = true; document.title = title; } };
+const fail = (reason) => verdict('FAIL: ' + reason);
+addEventListener('error', (event) => fail(event.message));
+setTimeout(() => fail('did not settle within 5s'), 5000);
+const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+const opacity = () => parseFloat(getComputedStyle(document.getElementById('box')).opacity);
+
+(async () => {
+  const box = document.getElementById('box');
+  // Replace: the keyframe value 0.2 replaces the base 0.5.
+  const anim = box.animate([{ opacity: 0.2 }, { opacity: 0.2 }], { duration: 10000 });
+  await anim.ready;
+  await frame();
+  if (opacity() !== 0.2) return fail('replace renders ' + opacity());
+  // Add: the keyframe value 0.2 adds to the base 0.5.
+  anim.effect.composite = 'add';
+  await frame();
+  await frame();
+  if (Math.abs(opacity() - 0.7) > 0.01) return fail('add renders ' + opacity());
+  anim.cancel();
+  verdict('PASS');
+})().catch((e) => fail(e.message));
+</script>

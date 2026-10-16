@@ -1,0 +1,28 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>effect-swap</title>
+<div id="box" style="width:50px;height:50px;background:teal"></div>
+<script>
+let settled = false;
+const verdict = (title) => { if (!settled) { settled = true; document.title = title; } };
+const fail = (reason) => verdict('FAIL: ' + reason);
+addEventListener('error', (event) => fail(event.message));
+setTimeout(() => fail('did not settle within 5s'), 5000);
+const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+const opacity = () => parseFloat(getComputedStyle(document.getElementById('box')).opacity);
+
+(async () => {
+  const box = document.getElementById('box');
+  const anim = box.animate([{ opacity: 0.2 }, { opacity: 0.2 }], { duration: 10000 });
+  await anim.ready;
+  await frame();
+  if (opacity() !== 0.2) return fail('opacity before the swap is ' + opacity());
+  // A different effect on the same target: its keyframes must replace the old ones.
+  anim.effect = new KeyframeEffect(box, [{ opacity: 0.9 }, { opacity: 0.9 }], { duration: 10000 });
+  await frame();
+  await frame();
+  if (opacity() !== 0.9) return fail('opacity after swapping the effect is ' + opacity());
+  anim.cancel();
+  verdict('PASS');
+})().catch((e) => fail(e.message));
+</script>

@@ -296,8 +296,28 @@ Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
   event queue note", "script: clarify why the animation sequence number is
   unused", "script: complete KeyframeEffect construction", "script:
   propagate exceptions and follow the spec order when reading keyframe
-  properties", "script: sample script animations through stylo".
+  properties", "script: sample script animations through stylo", "script:
+  resample when an animation's effect, target or time changes".
   Upstream: servo/servo#36950.
+  Known gaps in this patch set, for a later phase to pick up:
+  - **Replaced animations are never removed.** "Remove replaced animations"
+    (update animations and send events, step 2) is not implemented, so a
+    finished `fill: forwards` animation stays in the manager's list and in
+    stylo's animation set for the life of the document. Only animations
+    that are cancelled or finish without a fill leave the list.
+  - **Sampling is per tick.** The value of an animation changes only in a
+    rendering update. A synchronous `getComputedStyle` right after
+    `animate()`, `currentTime`, `effect.setKeyframes()`, `effect.target`,
+    `effect.composite` or `updateTiming()` reads the sample of the previous
+    frame. Pages wait a frame or a timer before they read the new value.
+  - **Unrendered targets.** A target that is not rendered is not dirtied
+    for its sampled value, so hidden animations do not restart restyles.
+    Their stylo entry is still rebuilt on each tick, because layout drops
+    entries for unrendered nodes after each reflow. Accepted: a running
+    animation on a `display: none` target pays one keyframe rebuild per
+    tick until it finishes, and a paused animation on such a target may
+    show a stale value once the target is shown again, until something
+    else ticks it. The script side has no hook for display changes.
 - **S13 (Web Animations API), stylo half.** `thomasmost/stylo`
   `paladin/0.22.0`: "Add script-driven animations to ElementAnimationSet",
   "Test equal-offset script keyframes and the cancel dirty flag".

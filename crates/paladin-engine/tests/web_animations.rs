@@ -42,6 +42,11 @@ const PAGES: &[&str] = &[
     "opacity-mid-animation.html",
     "cancel-reverts.html",
     "splash.html",
+    "effect-swap.html",
+    "effect-target.html",
+    "effect-composite.html",
+    "paused-resample.html",
+    "hidden-target-resumes.html",
 ];
 
 /// How long one page may take to report; the first page also pays for
