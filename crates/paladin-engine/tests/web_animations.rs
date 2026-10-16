@@ -37,6 +37,7 @@ const PAGES: &[&str] = &[
     "keyframes-round-trip.html",
     "computed-timing.html",
     "keyframes-errors.html",
+    "keyframes-order.html",
 ];
 
 /// How long one page may take to report; the first page also pays for

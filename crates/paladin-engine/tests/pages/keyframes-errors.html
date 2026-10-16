@@ -12,6 +12,10 @@ const throwsTypeError = (what, f) => {
   try { f(); } catch (e) { check(e instanceof TypeError, what + ' threw ' + e.name); return; }
   throw new Error(what + ' did not throw');
 };
+const throwsRangeError = (what, f) => {
+  try { f(); } catch (e) { check(e instanceof RangeError, what + ' threw ' + e.name); return; }
+  throw new Error(what + ' did not throw');
+};
 
 try {
   const box = document.getElementById('box');
@@ -31,6 +35,26 @@ try {
   throwsTypeError('bad effect easing', () => box.animate([{ opacity: 1 }], { easing: 'nope' }));
   throwsTypeError('bad composite', () => box.animate([{ opacity: 1, composite: 'blend' }], 100));
 
+  // An exception thrown by a getter reaches the caller as it was thrown: it is
+  // not swallowed, and it is not replaced by a TypeError.
+  throwsRangeError('array form getter throws', () =>
+    box.animate([{ get opacity() { throw new RangeError('getter'); } }], 100));
+  throwsRangeError('property-indexed getter throws', () =>
+    box.animate({ get opacity() { throw new RangeError('getter'); } }, 100));
+
+  // The composite, easing and offset members are converted before the
+  // animation properties are read, so the TypeError from composite wins over
+  // the RangeError thrown while converting the iterable of opacity.
+  throwsTypeError('composite converted before a throwing property', () =>
+    box.animate({
+      opacity: { [Symbol.iterator]() { throw new RangeError('iterator'); } },
+      composite: 'bogus',
+    }, 100));
+  throwsTypeError('bad property-indexed composite', () =>
+    box.animate({ opacity: [1, 0], composite: 'blend' }, 100));
+  throwsTypeError('non-finite property-indexed offset', () =>
+    box.animate({ opacity: [1, 0], offset: [NaN] }, 100));
+
   // Invalid property values are discarded, not thrown.
   const anim = box.animate([{ opacity: 'not-a-value', width: '10px' }], 100);
   const frame = anim.effect.getKeyframes()[0];
@@ -39,7 +63,7 @@ try {
 
   // A failing setKeyframes() leaves the keyframes alone.
   const effect = new KeyframeEffect(box, [{ opacity: 1 }, { opacity: 0 }], 100);
-  try { effect.setKeyframes([{ offset: 3 }]); } catch (e) {}
+  throwsTypeError('setKeyframes bad offset', () => effect.setKeyframes([{ offset: 3 }]));
   check(effect.getKeyframes().length === 2, 'keyframes changed after a failed setKeyframes');
 
   verdict('PASS');

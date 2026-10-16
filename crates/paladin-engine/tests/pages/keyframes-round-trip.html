@@ -22,6 +22,7 @@ try {
   check(effect.composite === 'replace', 'default composite is ' + effect.composite);
   effect.composite = 'accumulate';
   check(effect.composite === 'accumulate', 'composite setter');
+  check(new KeyframeEffect(box, null, { composite: 'add' }).composite === 'add', 'constructor composite');
   const frames = effect.getKeyframes();
   check(frames.length === 3, 'array form keyframe count ' + frames.length);
   check(frames[0].offset === null, 'frames[0].offset ' + frames[0].offset);
@@ -53,6 +54,13 @@ try {
   check(f[0].easing === 'ease-in' && f[1].easing === 'ease-out' && f[2].easing === 'ease-in', 'indexed easings repeat');
   check(f.every((k) => k.composite === 'replace'), 'indexed composite');
 
+  // A composite list leaves the 'auto' entries as 'auto' and applies the rest.
+  const mixed = new KeyframeEffect(box, { opacity: [1, 0, 1], composite: ['add', 'auto'] }, 100)
+    .getKeyframes();
+  check(mixed.length === 3, 'mixed composite count ' + mixed.length);
+  check(mixed[0].composite === 'add' && mixed[1].composite === 'auto' && mixed[2].composite === 'add',
+    'mixed composite ' + mixed.map((k) => k.composite).join());
+
   // setKeyframes replaces, null clears, animate() keeps the keyframes.
   effect.setKeyframes({ opacity: '0.25' });
   check(effect.getKeyframes().length === 1 && effect.getKeyframes()[0].computedOffset === 1, 'single keyframe');
@@ -61,6 +69,14 @@ try {
   const anim = box.animate([{ opacity: 0.2 }, { opacity: 0.8 }], 100);
   check(anim.effect.getKeyframes().length === 2, 'animate() keyframes');
   check(anim.effect.target === box, 'animate() target');
+
+  // Clearing the target leaves it null, and a later element is reflected.
+  const other = document.createElement('div');
+  const retarget = new KeyframeEffect(box, null, 100);
+  retarget.target = null;
+  check(retarget.target === null, 'target cleared');
+  retarget.target = other;
+  check(retarget.target === other, 'target reassigned after null');
 
   verdict('PASS');
 } catch (e) {
