@@ -294,7 +294,8 @@ Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
   animations on their own timeline", "script: use expect for the unused
   sequence number", "script: tidy the simple iteration progress check and
   event queue note", "script: clarify why the animation sequence number is
-  unused". Timing model only; sampling follows in later patches.
+  unused", "script: complete KeyframeEffect construction". Timing model and
+  effect construction only; sampling follows in later patches.
   Upstream: servo/servo#36950.
 
 ## Resolved

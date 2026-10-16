@@ -34,6 +34,9 @@ const PAGES: &[&str] = &[
     "options-dictionary.html",
     "null-timeline.html",
     "playback-event-constructor.html",
+    "keyframes-round-trip.html",
+    "computed-timing.html",
+    "keyframes-errors.html",
 ];
 
 /// How long one page may take to report; the first page also pays for

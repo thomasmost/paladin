@@ -12,8 +12,11 @@ releases yet; `Unreleased` holds everything on `main`.
   `Animation` implements the timing model (`play`, `pause`, `cancel`,
   `finish`, `reverse`, `playbackRate`, `updatePlaybackRate`, `currentTime`,
   `startTime`, `playState`, `pending`, `ready`, `finished`, `onfinish`,
-  `oncancel`). Animations do not change rendered style yet. Carried as a
-  patch in Paladin's Servo fork.
+  `oncancel`). Animations do not change rendered style yet.
+  `KeyframeEffect` applies its timing options and `composite`, exposes
+  `target`, accepts property-indexed keyframes and reports computed offsets
+  from `getKeyframes()`; `getComputedTiming()` returns real values. Carried
+  as a patch in Paladin's Servo fork.
 - Cargo workspace with a Servo-free core crate, an engine crate, the `paladin`
   binary, and an `xtask` helper, with project conventions (README, CHANGELOG,
   CLAUDE.md, ROADMAP), the knight-on-pegasus logo with generated icons, and CI

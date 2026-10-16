@@ -1,0 +1,49 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>keyframes-errors</title>
+<div id="box" style="width:50px;height:50px;background:teal"></div>
+<script>
+let settled = false;
+const verdict = (title) => { if (!settled) { settled = true; document.title = title; } };
+const fail = (reason) => verdict('FAIL: ' + reason);
+addEventListener('error', (event) => fail(event.message));
+const check = (condition, what) => { if (!condition) throw new Error(what); };
+const throwsTypeError = (what, f) => {
+  try { f(); } catch (e) { check(e instanceof TypeError, what + ' threw ' + e.name); return; }
+  throw new Error(what + ' did not throw');
+};
+
+try {
+  const box = document.getElementById('box');
+  throwsTypeError('unsorted offsets', () =>
+    box.animate([{ offset: 0.5, opacity: 1 }, { offset: 0.2, opacity: 0 }], 100));
+  throwsTypeError('offset above one', () => box.animate([{ offset: 2, opacity: 1 }], 100));
+  throwsTypeError('negative offset', () => box.animate([{ offset: -1, opacity: 1 }], 100));
+  throwsTypeError('bad keyframe easing', () =>
+    box.animate([{ opacity: 1, easing: 'not-an-easing' }], 100));
+  throwsTypeError('bad property-indexed easing', () =>
+    box.animate({ opacity: [1, 0], easing: ['bad'] }, 100));
+  throwsTypeError('bad unused easing', () =>
+    box.animate({ opacity: [1, 0], easing: ['linear', 'linear', 'bad'] }, 100));
+  throwsTypeError('non-object keyframe', () => box.animate([5], 100));
+  throwsTypeError('negative duration', () => box.animate([{ opacity: 1 }], -100));
+  throwsTypeError('negative iterations', () => box.animate([{ opacity: 1 }], { iterations: -1 }));
+  throwsTypeError('bad effect easing', () => box.animate([{ opacity: 1 }], { easing: 'nope' }));
+  throwsTypeError('bad composite', () => box.animate([{ opacity: 1, composite: 'blend' }], 100));
+
+  // Invalid property values are discarded, not thrown.
+  const anim = box.animate([{ opacity: 'not-a-value', width: '10px' }], 100);
+  const frame = anim.effect.getKeyframes()[0];
+  check(frame.opacity === undefined, 'invalid opacity kept: ' + frame.opacity);
+  check(frame.width === '10px', 'valid width lost');
+
+  // A failing setKeyframes() leaves the keyframes alone.
+  const effect = new KeyframeEffect(box, [{ opacity: 1 }, { opacity: 0 }], 100);
+  try { effect.setKeyframes([{ offset: 3 }]); } catch (e) {}
+  check(effect.getKeyframes().length === 2, 'keyframes changed after a failed setKeyframes');
+
+  verdict('PASS');
+} catch (e) {
+  fail(e.message);
+}
+</script>
