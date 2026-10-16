@@ -315,16 +315,18 @@ Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
   - **Unrendered targets.** A target that is not rendered is not dirtied
     for its sampled value, so hidden animations do not restart restyles.
     Layout cancels a stylo set only for a rooted node (one that has had CSS
-    animations or transitions while its set existed; a node stays rooted
-    for as long as its set is non-empty, and a script animation keeps it
-    non-empty) that has stopped rendering. A script-only target is never
-    rooted, so it keeps its entry and only its progress is set on each
-    tick. A rooted target loses its set in the reflow after it stops
-    rendering, and the next tick pushes its keyframes again. Accepted: a
-    running animation on a `display: none` target keeps its progress set
-    each tick, without a restyle, until it finishes, and a rooted target
-    additionally pays one keyframe rebuild per tick while hidden. Showing
-    the target again is a display change,
+    animations or transitions while its set existed; it stays rooted while
+    its set is non-empty or an event for it is pending) that has stopped
+    rendering. A script-only target is never rooted, so it keeps its entry
+    and only its progress is set on each tick. A rooted target loses its
+    set, script animations included, in the reflow after it stops
+    rendering. The next tick pushes its keyframes again, and once its
+    cancel events are sent it is unrooted and behaves like a script-only
+    target. A set that still holds a finished transition stays non-empty,
+    so that target stays rooted and pays one keyframe rebuild per tick
+    while hidden. Accepted: a running animation on a `display: none`
+    target keeps its progress set each tick, without a restyle, until it
+    finishes. Showing the target again is a display change,
     which triggers a rendering update, and that update samples script
     animations before reflow, so the value is current after the next frame.
     A synchronous `getComputedStyle` read still sees the previous tick (see
