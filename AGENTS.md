@@ -85,6 +85,18 @@ Run from the repo root:
   rebuild only the changed crates. The lock then records path sources: run
   `git checkout Cargo.lock` before committing, and remove the config table
   (or comment it out) to go back to the dist branches.
+- **Fork pitfalls.** Servo's own workspace resolves stylo from crates.io,
+  so `cargo check` inside `~/vibes/servo` never sees the stylo fork's
+  patches; compile-check Servo patches from Paladin with the local loop
+  (`cargo check -p paladin-engine`). Plain `cargo fmt` rewrites hundreds of
+  untouched places in both forks (Servo relies on the unstable options
+  `./mach fmt` passes, listed in `python/servo/testing_commands.py`; stylo
+  was formatted by an older rustfmt): in Servo pass those options after
+  `cargo fmt -p <crate> --`, and in either fork commit only the hunks you
+  wrote. `cargo update -p <servo|stylo> --precise` can also move unrelated
+  lock edges (it once rewrote windows-sys edges); keep the `Cargo.lock` diff
+  to the fork crates, by hand if needed, and validate with
+  `cargo metadata --locked`.
 - **Version pins move together.** `servo`, `winit`, `egui`, `egui-winit`,
   `egui_glow`, `glow`, and `surfman` are pinned to exact versions in the
   workspace `Cargo.toml` because they share a GL context and raw window
@@ -109,6 +121,13 @@ Run from the repo root:
 - **One `Engine` per process.** Servo's options are process-global, so each
   engine test binary (`headless`, `web_animations`) holds a single test
   function that builds one engine.
+- **Web Animations pages report through the title.** Each page in
+  `crates/paladin-engine/tests/pages/` sets `document.title` to `PASS` or
+  `FAIL: <reason>` exactly once, with an error listener and, if it waits for
+  frames or events, a timeout that fails it (the harness gives up after
+  120 s). Pages are not
+  discovered: add a new one to `PAGES` in `tests/web_animations.rs`, or it
+  never runs.
 - **The style-thread stack size is a build-time setting.** `.cargo/config.toml`
   exports `SERVO_STYLE_THREAD_STACK_SIZE_KB=8192` to every cargo invocation
   run from inside the repo; stylo reads it with `option_env!`, and its 512 KB
