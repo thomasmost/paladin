@@ -297,7 +297,9 @@ Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
   unused", "script: complete KeyframeEffect construction", "script:
   propagate exceptions and follow the spec order when reading keyframe
   properties", "script: sample script animations through stylo", "script:
-  resample when an animation's effect, target or time changes".
+  resample when an animation's effect, target or time changes", "script:
+  resample after a playback rate change and correct the unrendered-target
+  note".
   Upstream: servo/servo#36950.
   Known gaps in this patch set, for a later phase to pick up:
   - **Replaced animations are never removed.** "Remove replaced animations"
@@ -312,12 +314,18 @@ Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
     frame. Pages wait a frame or a timer before they read the new value.
   - **Unrendered targets.** A target that is not rendered is not dirtied
     for its sampled value, so hidden animations do not restart restyles.
-    Their stylo entry is still rebuilt on each tick, because layout drops
-    entries for unrendered nodes after each reflow. Accepted: a running
-    animation on a `display: none` target pays one keyframe rebuild per
-    tick until it finishes, and a paused animation on such a target may
-    show a stale value once the target is shown again, until something
-    else ticks it. The script side has no hook for display changes.
+    Layout cancels a stylo set only for a rooted node (one with CSS
+    animations or transitions) that has stopped rendering. A script-only
+    target is never rooted, so it keeps its entry and only its progress is
+    set on each tick. A target that also has CSS animations or transitions
+    loses its set in the reflow after it stops rendering, and the next tick
+    pushes its keyframes again. Accepted: a running animation on a
+    `display: none` target keeps its progress set each tick, without a
+    restyle, until it finishes. Showing the target again is a display change,
+    which triggers a rendering update, and that update samples script
+    animations before reflow, so the value is current after the next frame.
+    A synchronous `getComputedStyle` read still sees the previous tick (see
+    "Sampling is per tick"). The script side has no hook for display changes.
 - **S13 (Web Animations API), stylo half.** `thomasmost/stylo`
   `paladin/0.22.0`: "Add script-driven animations to ElementAnimationSet",
   "Test equal-offset script keyframes and the cancel dirty flag".

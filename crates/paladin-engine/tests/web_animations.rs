@@ -47,6 +47,8 @@ const PAGES: &[&str] = &[
     "effect-composite.html",
     "paused-resample.html",
     "hidden-target-resumes.html",
+    "filled-update-timing.html",
+    "paused-effect-changes.html",
 ];
 
 /// How long one page may take to report; the first page also pays for
