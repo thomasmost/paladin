@@ -1,0 +1,45 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>cancel-rejects</title>
+<div id="box" style="width:50px;height:50px;background:teal"></div>
+<script>
+let settled = false;
+const verdict = (title) => { if (!settled) { settled = true; document.title = title; } };
+const fail = (reason) => verdict('FAIL: ' + reason);
+addEventListener('error', (event) => fail(event.message));
+setTimeout(() => fail('no cancel within 5s'), 5000);
+
+(async () => {
+  const anim = document.getElementById('box').animate(
+    [{ opacity: 1 }, { opacity: 0 }], 10000);
+  const finished = anim.finished;
+  const ready = anim.ready;
+  let cancelEvent = null;
+  anim.oncancel = (event) => { cancelEvent = event; };
+  anim.cancel();
+  if (anim.playState !== 'idle') return fail('playState after cancel is ' + anim.playState);
+  if (anim.currentTime !== null) return fail('currentTime after cancel is ' + anim.currentTime);
+  if (anim.startTime !== null) return fail('startTime after cancel is ' + anim.startTime);
+  if (anim.finished === finished) return fail('finished promise was not replaced');
+  try {
+    await finished;
+    return fail('old finished promise resolved');
+  } catch (e) {
+    if (e.name !== 'AbortError') return fail('finished rejected with ' + e.name);
+  }
+  try {
+    await ready;
+    return fail('pending ready promise resolved after cancel');
+  } catch (e) {
+    if (e.name !== 'AbortError') return fail('ready rejected with ' + e.name);
+  }
+  if ((await anim.ready) !== anim) return fail('new ready promise is not resolved');
+  // The cancel event is delivered on the next animation frame.
+  for (let i = 0; i < 20 && !cancelEvent; i++) {
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+  }
+  if (!cancelEvent) return fail('no cancel event');
+  if (cancelEvent.currentTime !== null) return fail('cancel event currentTime is ' + cancelEvent.currentTime);
+  verdict('PASS');
+})().catch((e) => fail(e.message));
+</script>

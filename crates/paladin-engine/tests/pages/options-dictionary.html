@@ -1,0 +1,38 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>options-dictionary</title>
+<div id="box" style="width:50px;height:50px;background:teal"></div>
+<script>
+let settled = false;
+const verdict = (title) => { if (!settled) { settled = true; document.title = title; } };
+const fail = (reason) => verdict('FAIL: ' + reason);
+addEventListener('error', (event) => fail(event.message));
+setTimeout(() => fail('did not settle within 5s'), 5000);
+
+(() => {
+  const box = document.getElementById('box');
+  const keyframes = [{ opacity: 1 }, { opacity: 0 }];
+  const anim = box.animate(keyframes, {
+    duration: 400, iterations: 3, delay: 100, fill: 'both', id: 'named',
+  });
+  if (anim.id !== 'named') return fail('id is ' + anim.id);
+  const timing = anim.effect.getComputedTiming();
+  if (timing.duration !== 400) return fail('duration is ' + timing.duration);
+  if (timing.iterations !== 3) return fail('iterations is ' + timing.iterations);
+  if (timing.delay !== 100) return fail('delay is ' + timing.delay);
+  if (timing.endDelay !== 0) return fail('endDelay is ' + timing.endDelay);
+  if (timing.fill !== 'both') return fail('fill is ' + timing.fill);
+  if (timing.direction !== 'normal') return fail('direction is ' + timing.direction);
+  if (timing.activeDuration !== 1200) return fail('activeDuration is ' + timing.activeDuration);
+  if (timing.endTime !== 1300) return fail('endTime is ' + timing.endTime);
+
+  // A bare number is the duration; the id stays empty.
+  const bare = box.animate(keyframes, 250);
+  if (bare.id !== '') return fail('id of a bare-duration animation is ' + bare.id);
+  const bareTiming = bare.effect.getComputedTiming();
+  if (bareTiming.duration !== 250) return fail('bare duration is ' + bareTiming.duration);
+  if (bareTiming.iterations !== 1) return fail('bare iterations is ' + bareTiming.iterations);
+  if (bareTiming.endTime !== 250) return fail('bare endTime is ' + bareTiming.endTime);
+  verdict('PASS');
+})();
+</script>

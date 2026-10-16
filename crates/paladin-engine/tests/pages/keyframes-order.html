@@ -1,0 +1,49 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>keyframes-order</title>
+<div id="box" style="width:50px;height:50px;background:teal"></div>
+<script>
+let settled = false;
+const verdict = (title) => { if (!settled) { settled = true; document.title = title; } };
+const fail = (reason) => verdict('FAIL: ' + reason);
+addEventListener('error', (event) => fail(event.message));
+const check = (condition, what) => { if (!condition) throw new Error(what); };
+
+try {
+  const box = document.getElementById('box');
+
+  // The getters record the order in which the keyframe is read. The
+  // properties are listed out of order on purpose: the spec reads the
+  // composite, easing and offset members first (dictionary order), then the
+  // animation properties sorted by IDL attribute name.
+  const order = [];
+  const expectOrder = (expected, what) => {
+    check(order.join() === expected.join(), what + ' read ' + order.join());
+  };
+  const keyframe = {
+    get marginLeft() { order.push('marginLeft'); return '1px'; },
+    get color() { order.push('color'); return 'red'; },
+    get opacity() { order.push('opacity'); return 1; },
+  };
+  const indexed = {
+    get marginLeft() { order.push('marginLeft'); return '1px'; },
+    get color() { order.push('color'); return 'red'; },
+    get opacity() { order.push('opacity'); return 1; },
+    get composite() { order.push('composite'); return 'replace'; },
+    get easing() { order.push('easing'); return 'linear'; },
+    get offset() { order.push('offset'); return [0, 1]; },
+  };
+
+  box.animate(indexed, 100);
+  expectOrder(['composite', 'easing', 'offset', 'color', 'marginLeft', 'opacity'],
+    'property-indexed form');
+
+  order.length = 0;
+  box.animate([keyframe], 100);
+  expectOrder(['color', 'marginLeft', 'opacity'], 'array form');
+
+  verdict('PASS');
+} catch (e) {
+  fail(e.message);
+}
+</script>

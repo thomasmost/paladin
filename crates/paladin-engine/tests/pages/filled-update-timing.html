@@ -1,0 +1,59 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>filled-update-timing</title>
+<div id="box" style="width:50px;height:50px;background:teal"></div>
+<script>
+let settled = false;
+const verdict = (title) => { if (!settled) { settled = true; document.title = title; } };
+const fail = (reason) => verdict('FAIL: ' + reason);
+// Every check runs; the verdict lists each one that failed.
+const failures = [];
+const record = (reason) => failures.push(reason);
+addEventListener('error', (event) => fail(event.message));
+setTimeout(() => fail('did not settle within 10s'), 10000);
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const opacity = () => parseFloat(getComputedStyle(document.getElementById('box')).opacity);
+
+(async () => {
+  const box = document.getElementById('box');
+
+  // updateTiming() on a paused animation. Paused animations are not ticked,
+  // so the timing change itself must schedule the resample; a timer, not a
+  // frame, gives the page time to show it.
+  const paused = box.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1000, fill: 'both' });
+  paused.pause();
+  paused.currentTime = 0;
+  await paused.ready;
+  await wait(300);
+  if (opacity() !== 1) record('paused at 0ms renders ' + opacity());
+  paused.effect.updateTiming({ direction: 'reverse' });
+  await wait(300);
+  if (Math.abs(opacity() - 0) > 0.01) record('paused after updateTiming(reverse) renders ' + opacity());
+  paused.cancel();
+
+  // updateTiming() on a finished animation that still fills. It stays
+  // finished, so only the timing change can refresh the filled value.
+  const filled = box.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 500, fill: 'forwards' });
+  await filled.finished;
+  await wait(300);
+  if (opacity() !== 0) record('filled end value renders ' + opacity());
+  filled.effect.updateTiming({ direction: 'reverse' });
+  await wait(300);
+  if (Math.abs(opacity() - 1) > 0.01) record('filled after updateTiming(reverse) renders ' + opacity());
+  filled.cancel();
+
+  // Re-registration: a fill 'none' animation finishes and leaves the
+  // manager's list. Adding a fill later makes it relevant again, and it has
+  // to be resampled without a frame of its own.
+  const dropped = box.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: 'none' });
+  await dropped.finished;
+  await wait(300);
+  if (opacity() !== 1) record('finished without fill renders ' + opacity());
+  dropped.effect.updateTiming({ fill: 'forwards' });
+  await wait(300);
+  if (Math.abs(opacity() - 0) > 0.01) record('re-filled after updateTiming renders ' + opacity());
+  dropped.cancel();
+
+  verdict(failures.length ? 'FAIL: ' + failures.join('; ') : 'PASS');
+})().catch((e) => fail(e.message));
+</script>

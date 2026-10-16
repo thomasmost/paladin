@@ -43,6 +43,11 @@ Xcode Command Line Tools on macOS, or Visual Studio Build Tools with the
 is downloaded prebuilt during the build, so no CMake, MozTools, or GStreamer
 is required.
 
+Servo and stylo are built from Paladin's forks (`thomasmost/servo`,
+`thomasmost/stylo`): the root `Cargo.toml` patches their crates to small
+`dist/*` branches that cargo fetches like any git dependency, so no extra
+setup is needed. `CLAUDE.md` describes how to work on the forks.
+
 1. **Build and run:** `cargo run` opens a window at the homepage. Pass URLs
    to open them as tabs, or `--profile <name>` to use another profile.
 2. **Windows only, before running:** `cargo xtask angle-dlls` copies
@@ -126,6 +131,10 @@ or engine glue. Each item must pass.
 11. **Clean exit.** Closing the last window, Cmd+Q from a browser window or
     from the settings window, and Quit from the Dock menu (macOS) all exit
     with code 0 and no Servo error output.
+12. **Web Animations.** Open `https://bsky.app`: the blue splash screen fades
+    out and the landing page or feed renders and scrolls. (Script animations
+    are sampled by Paladin's Servo and stylo forks; see
+    `docs/upstream-issues.md`, "Carried in the fork".)
 
 ## Packaging
 
@@ -173,9 +182,6 @@ Upstream causes and the features they block are tracked in
 - Textareas sized by their `rows` attribute are shorter than in other
   browsers (Servo uses rows × font size, not rows × line height), so one-row
   fields such as Google's search box cut off descenders.
-- Sites that use the Web Animations API (`element.animate()`), such as
-  bsky.app, throw script errors and may not load (Servo 0.7.0 does not
-  implement it).
 - No search engine: address-bar text that is not a URL is ignored.
 - Stop is disabled while a page loads (Servo 0.7.0 has no API for it).
 - No macOS application menu: winit's default menu is turned off so that

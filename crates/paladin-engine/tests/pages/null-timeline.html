@@ -1,0 +1,70 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>null-timeline</title>
+<div id="box" style="width:50px;height:50px;background:teal"></div>
+<script>
+let settled = false;
+const verdict = (title) => { if (!settled) { settled = true; document.title = title; } };
+const fail = (reason) => verdict('FAIL: ' + reason);
+addEventListener('error', (event) => fail(event.message));
+setTimeout(() => fail('did not settle within 5s'), 5000);
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+(async () => {
+  const box = document.getElementById('box');
+  const keyframes = [{ opacity: 1 }, { opacity: 0 }];
+
+  // An explicit null timeline never plays: the play task waits for a timeline.
+  const anim = box.animate(keyframes, { duration: 100, timeline: null });
+  if (anim.timeline !== null) return fail('timeline is ' + anim.timeline);
+  if (!anim.pending) return fail('not pending with a null timeline');
+  let resolved = false;
+  anim.ready.then(() => { resolved = true; });
+  await sleep(300);
+  if (resolved) return fail('ready resolved with a null timeline');
+  if (!anim.pending) return fail('pending cleared with a null timeline');
+  // "play an animation" held the current time at 0; with no timeline it
+  // stays there, so the time is not advanced by any timeline.
+  if (anim.currentTime !== 0) return fail('currentTime with a null timeline is ' + anim.currentTime);
+
+  // The animation was never registered with the document (it had no timeline
+  // from creation). Giving it one registers it for the first time, so its
+  // pending play task runs and ready resolves. If it were not registered,
+  // nothing would run that task: ready would never resolve and the guard at
+  // the top of the page would report the failure.
+  anim.timeline = document.timeline;
+  await anim.ready;
+  if (anim.pending) return fail('still pending after a timeline was set');
+  if (anim.playState !== 'running') return fail('playState after a timeline was set is ' + anim.playState);
+
+  // Setting the timeline to null on a running animation unresolves its
+  // current time, and nothing advances it while it has no timeline. The
+  // duration is 1 s so that the restored animation below finishes soon.
+  const running = box.animate(keyframes, 1000);
+  await running.ready;
+  running.timeline = null;
+  if (running.timeline !== null) return fail('timeline after null assignment is ' + running.timeline);
+  if (running.currentTime !== null) return fail('currentTime after timeline = null is ' + running.currentTime);
+  await sleep(300);
+  if (running.currentTime !== null) return fail('currentTime moved without a timeline: ' + running.currentTime);
+
+  // The document dropped the animation from its list on a tick while it had no
+  // timeline. Restoring a document timeline keeps the start time, so the
+  // current time resolves again and includes the time spent without a timeline.
+  running.timeline = document.timeline;
+  const restored = running.currentTime;
+  if (restored === null) return fail('currentTime stays null after the timeline is restored');
+  // Its time advances while it runs on the restored timeline.
+  await sleep(300);
+  if (!(running.currentTime > restored)) {
+    return fail('currentTime did not advance after the timeline was restored: ' + restored + ' -> ' + running.currentTime);
+  }
+  // Finishing needs the animation to be ticked by the document again, which
+  // only happens when it is registered again. Without that, finished never
+  // resolves and the guard reports the failure.
+  await running.finished;
+  if (running.playState !== 'finished') return fail('playState after finishing is ' + running.playState);
+  verdict('PASS');
+})().catch((e) => fail(e.message));
+</script>

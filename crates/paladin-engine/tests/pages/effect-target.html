@@ -1,0 +1,30 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>effect-target</title>
+<div id="a" style="width:50px;height:50px;background:teal"></div>
+<div id="b" style="width:50px;height:50px;background:navy;margin-top:10px"></div>
+<script>
+let settled = false;
+const verdict = (title) => { if (!settled) { settled = true; document.title = title; } };
+const fail = (reason) => verdict('FAIL: ' + reason);
+addEventListener('error', (event) => fail(event.message));
+setTimeout(() => fail('did not settle within 5s'), 5000);
+const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+const opacityOf = (id) => parseFloat(getComputedStyle(document.getElementById(id)).opacity);
+
+(async () => {
+  const a = document.getElementById('a');
+  const b = document.getElementById('b');
+  const anim = a.animate([{ opacity: 0.2 }, { opacity: 0.2 }], { duration: 10000 });
+  await anim.ready;
+  await frame();
+  if (opacityOf('a') !== 0.2) return fail('a while targeted is ' + opacityOf('a'));
+  anim.effect.target = b;
+  await frame();
+  await frame();
+  if (opacityOf('a') !== 1) return fail('a after retargeting is ' + opacityOf('a'));
+  if (opacityOf('b') !== 0.2) return fail('b after retargeting is ' + opacityOf('b'));
+  anim.cancel();
+  verdict('PASS');
+})().catch((e) => fail(e.message));
+</script>

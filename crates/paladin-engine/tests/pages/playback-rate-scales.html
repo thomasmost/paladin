@@ -1,0 +1,35 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>playback-rate-scales</title>
+<div id="box" style="width:50px;height:50px;background:teal"></div>
+<script>
+let settled = false;
+const verdict = (title) => { if (!settled) { settled = true; document.title = title; } };
+const fail = (reason) => verdict('FAIL: ' + reason);
+addEventListener('error', (event) => fail(event.message));
+setTimeout(() => fail('did not settle within 5s'), 5000);
+
+(async () => {
+  const anim = document.getElementById('box').animate(
+    [{ opacity: 1 }, { opacity: 0 }], 2000);
+  anim.playbackRate = 8;
+  if (anim.playbackRate !== 8) return fail('playbackRate is ' + anim.playbackRate);
+  const started = performance.now();
+  await anim.finished;
+  const elapsed = performance.now() - started;
+  if (elapsed > 1000) return fail('finished after ' + elapsed + 'ms at 8x');
+  if (anim.currentTime !== 2000) return fail('currentTime after finish is ' + anim.currentTime);
+  // Reversing from the end plays back to zero.
+  anim.reverse();
+  if (anim.playState !== 'running') return fail('playState after reverse() is ' + anim.playState);
+  await anim.finished;
+  if (anim.currentTime !== 0) return fail('currentTime after reversed finish is ' + anim.currentTime);
+  if (anim.playbackRate !== -8) return fail('playbackRate after reverse is ' + anim.playbackRate);
+  // On a finished animation no play task is pending, so updatePlaybackRate()
+  // applies the rate at once and playbackRate reads back 1 straight away.
+  anim.updatePlaybackRate(1);
+  await anim.ready;
+  if (anim.playbackRate !== 1) return fail('playbackRate after updatePlaybackRate is ' + anim.playbackRate);
+  verdict('PASS');
+})().catch((e) => fail(e.message));
+</script>

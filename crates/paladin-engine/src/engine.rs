@@ -69,7 +69,11 @@ impl Engine {
         let servo = catch_unwind(AssertUnwindSafe(|| {
             ServoBuilder::default()
                 .opts(opts)
-                .preferences(Preferences::default())
+                .preferences(Preferences {
+                    // Web Animations: implemented in Paladin's Servo fork.
+                    dom_web_animations_enabled: true,
+                    ..Preferences::default()
+                })
                 .event_loop_waker(Box::new(ServoWaker(waker)))
                 .build()
         }))

@@ -1,0 +1,32 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>cancel-reverts</title>
+<div id="box" style="width:50px;height:50px;background:teal"></div>
+<script>
+let settled = false;
+const verdict = (title) => { if (!settled) { settled = true; document.title = title; } };
+const fail = (reason) => verdict('FAIL: ' + reason);
+addEventListener('error', (event) => fail(event.message));
+setTimeout(() => fail('did not settle within 5s'), 5000);
+const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+const opacity = () => parseFloat(getComputedStyle(document.getElementById('box')).opacity);
+
+(async () => {
+  const box = document.getElementById('box');
+  const anim = box.animate([{ opacity: 0.2 }, { opacity: 0.2 }], { duration: 10000 });
+  await anim.ready;
+  await frame();
+  if (opacity() !== 0.2) return fail('opacity while running is ' + opacity());
+  anim.cancel();
+  await frame();
+  await frame();
+  if (opacity() !== 1) return fail('opacity after cancel is ' + opacity());
+  // A finished animation without a fill also reverts.
+  const short = box.animate([{ opacity: 0.4 }, { opacity: 0.4 }], 50);
+  await short.finished;
+  await frame();
+  await frame();
+  if (opacity() !== 1) return fail('opacity after an unfilled finish is ' + opacity());
+  verdict('PASS');
+})().catch((e) => fail(e.message));
+</script>

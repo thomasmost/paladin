@@ -16,6 +16,10 @@ _State recorded as of 2026-10-15, against Servo 0.7.0, egui 0.34, winit 0.30._
   or search again.
 - On every Servo bump, re-check each `S` entry: the state, whether the
   workaround can go, and whether the dependent feature is now unblocked.
+- An issue fixed by a patch in Paladin's Servo or stylo fork moves to the
+  "Carried in the fork" section below with the patch commit's subject; on
+  every Servo bump re-check whether upstream has merged it and, if so, drop
+  the patch during the rebase and move the entry to "Resolved".
 - When an entry is resolved upstream and Paladin has picked the fix up, move
   it to the Resolved section rather than deleting it: the history explains
   workarounds that remain in the code.
@@ -36,7 +40,7 @@ or starts with the workaround noted in the entry.
   - Ellipsis on overflowing titles and labels:
     [S4](#s4-text-overflow-unsupported).
   - Sites that call `element.animate()` without feature detection
-    (bsky.app): [S13](#s13-web-animations-api-unimplemented).
+    (bsky.app): [Carried in the fork: Web Animations](#carried-in-the-fork).
   - Clean stderr on exit: [S6](#s6-memory-profiler-warnings-on-exit).
   - Quiet `cargo build` on macOS:
     [T1](#t1-__eh_frame-section-too-large-linker-warning-on-macos).
@@ -205,33 +209,6 @@ or starts with the workaround noted in the entry.
 - **Blocks:** in-process profiles, as an alternative route to resolving
   [S7](#s7-no-profile-concept-site-data-is-per-process).
 
-### S13: Web Animations API unimplemented
-
-- **Upstream:** [servo/servo#36950][36950] (open, "Implement
-  WebAnimations"; a contributor has an in-progress branch since 2026-04);
-  [servo/servo#44174][44174] (open) is the bsky.app report.
-- **What it is:** `Element.animate()`, `Animation`, and `KeyframeEffect`
-  sit behind the `dom_web_animations_enabled` pref, which is off by
-  default (servo-config-0.7.0, `prefs.rs`). With it off, `element.animate`
-  is undefined. With it on, the interface is a skeleton:
-  `Animation.webidl` comments out `play()`, `cancel()`, `finish()`,
-  `finished`, `onfinish`, and `currentTime`, and `Element::Animate` skips
-  the step that plays the animation (servo-script-0.7.0,
-  `dom/element/element.rs`). `getAnimations()` is missing too.
-- **Effect:** pages that call `element.animate()` throw `t.animate is not a
-  function`, which Paladin logs as an ERROR from
-  `paladin_engine::delegate`. bsky.app breaks in a critical path; the
-  upstream issues also name airbnb.com and beatleader.com.
-- **Workaround:** none. Turning the pref on only moves the exception to the
-  next missing member and defeats sites that feature-detect `animate` and
-  fall back to CSS. Injecting the web-animations-js polyfill through
-  `UserContentManager` is possible (suggested in #44174) but is feature
-  work for one API.
-- **Blocks:** nothing on the roadmap; a README Known limitations entry.
-- **When it lands:** check whether Servo enables the pref by default; if
-  not, decide whether to set it in `Engine`'s `Preferences`. Load bsky.app
-  and remove the README entry.
-
 ## egui and winit
 
 None yet. The IME item looked like one; see Checked and not upstream.
@@ -277,18 +254,112 @@ Kept so nobody waits on upstream for them.
   the per-host default (app and dmg on macOS, NSIS on Windows); see
   `CLAUDE.md`.
 
+## Carried in the fork
+
+Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
+(`paladin/0.22.0`), each listed against the upstream issue it addresses.
+
+- **Web Animations API (was S13).** Upstream [servo/servo#36950][36950] and
+  [#44174][44174]: Servo 0.7.0 ships the API behind
+  `dom_web_animations_enabled` with the playback and sampling halves
+  unimplemented. Carried as `thomasmost/servo`
+  `paladin/0.7.0` (17 patch commits, oldest first): "script: add the Web
+  Animations timing calculations", "script: add AnimationPlaybackEvent",
+  "script: implement the Animation timing model", "script: finish
+  Element.animate()", "script: request a rendering update for queued
+  animation events", "script: tick script animations on their own timeline",
+  "script: use expect for the unused sequence number", "script: tidy the
+  simple iteration progress check and event queue note", "script: clarify
+  why the animation sequence number is unused", "script: complete
+  KeyframeEffect construction", "script: propagate exceptions and follow the
+  spec order when reading keyframe properties", "script: sample script
+  animations through stylo", "script: resample when an animation's effect,
+  target or time changes", "script: resample after a playback rate change
+  and correct the unrendered-target note", "script: implement
+  Element.getAnimations() and Document.getAnimations()", "script: document
+  the scope of getAnimations()", "script: note when a moved animation leaves
+  getAnimations()"; and
+  `thomasmost/stylo` `paladin/0.22.0` (2 patch commits, oldest first):
+  "Add script-driven animations to ElementAnimationSet", "Test equal-offset
+  script keyframes and the cancel dirty flag". Paladin enables the pref in
+  `Engine`. Not covered: `CSSAnimation`/`CSSTransition` objects,
+  `commitStyles`, `persist`, replace-state removal, pseudo-element targets,
+  shadow-root `getAnimations`. Animations whose timeline's document differs
+  from their target's document (same-origin iframes, targets adopted into
+  another document) are not returned by `getAnimations()`, because the
+  registry is per timeline document, and animations on a null timeline are
+  never registered, so they are not returned either. An animation moved off
+  a document's timeline stays listed by that document's `getAnimations()`
+  until the document's next tick, because the filter does not check the
+  timeline. On each Servo bump check whether upstream has landed any of
+  #36950's follow-ups and drop the overlapping patches. The series carries
+  its review fix-ups as separate commits (about half of the 17); squash
+  them into one commit per logical change (timing calculations, playback
+  event, timing model, `animate()`, event and rendering-update plumbing,
+  `KeyframeEffect` construction, stylo sampling, `getAnimations()`) during
+  the 0.8.0 rebase, before republishing, so later rebases stay mechanical.
+  Known gaps in this patch set, for a later phase to pick up:
+  - **Keyframes resolve once.** stylo resolves a script animation's
+    keyframes against the element's style on the first restyle after they
+    are pushed and not again; later changes to the base style (`em` or
+    `var()` values, the implicit 0 and 1 keyframes, the underlying value
+    for `add`) are not picked up until the keyframes are pushed again. CSS
+    animations in stylo re-resolve only on `animation-*` changes, so the
+    precision matches for the common case.
+  - **Overshooting easings are clamped.** The script side pushes the
+    transformed progress; an effect easing that overshoots (for example
+    `cubic-bezier(.5, -.5, .5, 1.5)`) yields progress outside 0..1, which
+    the spec extrapolates from the first or last keyframe interval. stylo's
+    sampler clamps to the end keyframes instead.
+  - **The first keyframe's easing covers the implicit 0 interval.** When
+    the first keyframe omits a property, its value comes from the base
+    style but the interval up to the next keyframe that sets the property
+    keeps the first keyframe's easing; the spec gives the implicit 0
+    keyframe a linear easing. stylo's CSS animation path behaves the same
+    way.
+  - **Replaced animations are never removed.** "Remove replaced animations"
+    (update animations and send events, step 2) is not implemented, so a
+    finished `fill: forwards` animation stays in the manager's list and in
+    stylo's animation set for the life of the document. Only animations
+    that are cancelled or finish without a fill leave the list.
+  - **Sampling is per tick.** The value of an animation changes only in a
+    rendering update. A synchronous `getComputedStyle` right after
+    `animate()`, `currentTime`, `effect.setKeyframes()`, `effect.target`,
+    `effect.composite` or `updateTiming()` reads the sample of the previous
+    frame. Pages wait a frame or a timer before they read the new value.
+  - **Unrendered targets.** A target that is not rendered is not dirtied for
+    its sampled value, so hidden animations on targets that are not rooted
+    do not restart restyles. Layout cancels a stylo set only for a rooted
+    node (one that has had CSS animations or transitions while its set
+    existed; it stays rooted while its set is non-empty or an event for it
+    is pending) that has stopped rendering. A script-only target is never
+    rooted, so it keeps its entry and only its progress is set on each
+    tick. A rooted target loses its set, script animations included, in the
+    reflow after it stops rendering. The next tick pushes its keyframes
+    again, and once its cancel events are sent it is unrooted and behaves
+    like a script-only target. A set that still holds a finished transition
+    stays non-empty, so that target stays rooted, is dirtied by the
+    animation manager and pays one keyframe rebuild per tick while hidden.
+    Accepted: a running animation on a `display: none` target that is not
+    rooted keeps its progress set each tick, without a restyle, until it
+    finishes. Showing the target again is a display change, which triggers
+    a rendering update, and that update samples script animations before
+    reflow, so the value is current after the next frame. A synchronous
+    `getComputedStyle` read still sees the previous tick (see "Sampling is
+    per tick"). The script side has no hook for display changes.
+
 ## Resolved
 
 Entries move here once upstream has shipped the fix and Paladin has picked
 it up. None yet.
 
+[36950]: https://github.com/servo/servo/issues/36950
+[44174]: https://github.com/servo/servo/issues/44174
 [13263]: https://github.com/servo/servo/issues/13263
 [13702]: https://github.com/servo/servo/issues/13702
 [13925]: https://github.com/servo/servo/issues/13925
-[36950]: https://github.com/servo/servo/issues/36950
 [40444]: https://github.com/servo/servo/issues/40444
 [43888]: https://github.com/servo/servo/pull/43888
-[44174]: https://github.com/servo/servo/issues/44174
 [44426]: https://github.com/servo/servo/issues/44426
 [46562]: https://github.com/servo/servo/issues/46562
 [47126]: https://github.com/servo/servo/issues/47126

@@ -1,0 +1,85 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>keyframes-round-trip</title>
+<div id="box" style="width:50px;height:50px;background:teal"></div>
+<script>
+let settled = false;
+const verdict = (title) => { if (!settled) { settled = true; document.title = title; } };
+const fail = (reason) => verdict('FAIL: ' + reason);
+addEventListener('error', (event) => fail(event.message));
+const check = (condition, what) => { if (!condition) throw new Error(what); };
+
+try {
+  const box = document.getElementById('box');
+
+  // Array form.
+  const effect = new KeyframeEffect(box, [
+    { opacity: 1, easing: 'ease-in', composite: 'add' },
+    { opacity: 0.5 },
+    { opacity: 0, offset: 1 },
+  ], { duration: 100 });
+  check(effect.target === box, 'target');
+  check(effect.composite === 'replace', 'default composite is ' + effect.composite);
+  effect.composite = 'accumulate';
+  check(effect.composite === 'accumulate', 'composite setter');
+  check(new KeyframeEffect(box, null, { composite: 'add' }).composite === 'add', 'constructor composite');
+  const frames = effect.getKeyframes();
+  check(frames.length === 3, 'array form keyframe count ' + frames.length);
+  check(frames[0].offset === null, 'frames[0].offset ' + frames[0].offset);
+  check(frames[0].computedOffset === 0, 'frames[0].computedOffset ' + frames[0].computedOffset);
+  check(frames[1].computedOffset === 0.5, 'frames[1].computedOffset ' + frames[1].computedOffset);
+  check(frames[2].offset === 1 && frames[2].computedOffset === 1, 'frames[2] offsets');
+  check(frames[0].easing === 'ease-in', 'frames[0].easing ' + frames[0].easing);
+  check(frames[1].easing === 'linear', 'frames[1].easing ' + frames[1].easing);
+  check(frames[0].composite === 'add', 'frames[0].composite ' + frames[0].composite);
+  check(frames[1].composite === 'auto', 'frames[1].composite ' + frames[1].composite);
+  check(frames[0].opacity === '1', 'frames[0].opacity ' + frames[0].opacity);
+  check(frames[1].opacity === '0.5', 'frames[1].opacity ' + frames[1].opacity);
+
+  // Property-indexed form.
+  const indexed = new KeyframeEffect(box, {
+    opacity: [1, 0.5, 0],
+    transform: ['scale(1)', 'scale(2)'],
+    easing: ['ease-in', 'ease-out'],
+    offset: [0, 0.25],
+    composite: 'replace',
+  }, 100);
+  const f = indexed.getKeyframes();
+  check(f.length === 3, 'indexed keyframe count ' + f.length);
+  check(f[0].opacity === '1' && f[0].transform === 'scale(1)', 'f[0] values');
+  check(f[1].opacity === '0.5' && f[1].transform === undefined, 'f[1] values');
+  check(f[2].opacity === '0' && f[2].transform === 'scale(2)', 'f[2] values');
+  check(f[0].offset === 0 && f[1].offset === 0.25 && f[2].offset === null, 'indexed offsets');
+  check(f[1].computedOffset === 0.25 && f[2].computedOffset === 1, 'indexed computed offsets');
+  check(f[0].easing === 'ease-in' && f[1].easing === 'ease-out' && f[2].easing === 'ease-in', 'indexed easings repeat');
+  check(f.every((k) => k.composite === 'replace'), 'indexed composite');
+
+  // A composite list leaves the 'auto' entries as 'auto' and applies the rest.
+  const mixed = new KeyframeEffect(box, { opacity: [1, 0, 1], composite: ['add', 'auto'] }, 100)
+    .getKeyframes();
+  check(mixed.length === 3, 'mixed composite count ' + mixed.length);
+  check(mixed[0].composite === 'add' && mixed[1].composite === 'auto' && mixed[2].composite === 'add',
+    'mixed composite ' + mixed.map((k) => k.composite).join());
+
+  // setKeyframes replaces, null clears, animate() keeps the keyframes.
+  effect.setKeyframes({ opacity: '0.25' });
+  check(effect.getKeyframes().length === 1 && effect.getKeyframes()[0].computedOffset === 1, 'single keyframe');
+  effect.setKeyframes(null);
+  check(effect.getKeyframes().length === 0, 'null keyframes');
+  const anim = box.animate([{ opacity: 0.2 }, { opacity: 0.8 }], 100);
+  check(anim.effect.getKeyframes().length === 2, 'animate() keyframes');
+  check(anim.effect.target === box, 'animate() target');
+
+  // Clearing the target leaves it null, and a later element is reflected.
+  const other = document.createElement('div');
+  const retarget = new KeyframeEffect(box, null, 100);
+  retarget.target = null;
+  check(retarget.target === null, 'target cleared');
+  retarget.target = other;
+  check(retarget.target === other, 'target reassigned after null');
+
+  verdict('PASS');
+} catch (e) {
+  fail(e.message);
+}
+</script>

@@ -8,3 +8,10 @@ xtask = "run --package xtask --"
 # depth; it only reserves address space. Applies to cargo build, run, test,
 # and cargo-packager's build.
 SERVO_STYLE_THREAD_STACK_SIZE_KB = "8192"
+# servo-script-bindings' build script runs its WebIDL codegen with
+# `uv run --frozen python` when uv is installed. Inside a full Servo checkout
+# (the local path-patch loop, see CLAUDE.md) that would sync Servo's Python
+# environment into the checkout first; the codegen needs only the standard
+# library, so skip the sync. Harmless for the dist branches, which carry no
+# pyproject.toml (uv prints a one-line "no effect" warning).
+UV_NO_SYNC = "1"

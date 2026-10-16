@@ -1,0 +1,83 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>get-animations</title>
+<div id="box" style="width:50px;height:50px;background:teal"><span id="child">x</span></div>
+<div id="other"></div>
+<script>
+let settled = false;
+const verdict = (title) => { if (!settled) { settled = true; document.title = title; } };
+const fail = (reason) => verdict('FAIL: ' + reason);
+addEventListener('error', (event) => fail(event.message));
+setTimeout(() => fail('did not settle within 5s'), 5000);
+const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+const same = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+const check = (condition, what) => { if (!condition) throw new Error(what); };
+
+(async () => {
+  const box = document.getElementById('box');
+  const child = document.getElementById('child');
+  const other = document.getElementById('other');
+  check(box.getAnimations().length === 0, 'animations before animate()');
+  check(document.getAnimations().length === 0, 'document animations before animate()');
+
+  const a1 = box.animate([{ opacity: 1 }, { opacity: 0 }], 10000);
+  const a2 = child.animate([{ opacity: 1 }, { opacity: 0 }], 10000);
+  const a3 = box.animate([{ opacity: 1 }, { opacity: 0 }], 10000);
+  const a4 = other.animate([{ opacity: 1 }, { opacity: 0 }], 10000);
+  check(same(box.getAnimations(), [a1, a3]), 'box animations in creation order');
+  check(same(box.getAnimations({ subtree: true }), [a1, a2, a3]), 'subtree animations');
+  check(same(child.getAnimations(), [a2]), 'child animations');
+  check(same(document.getAnimations(), [a1, a2, a3, a4]), 'document animations');
+  check(box.getAnimations({ pseudoElement: '::before' }).length === 0, 'pseudo-element animations');
+
+  a1.cancel();
+  check(same(box.getAnimations(), [a3]), 'cancelled animation listed');
+  a3.pause();
+  check(same(box.getAnimations(), [a3]), 'paused animation missing');
+  a3.finish();
+  check(box.getAnimations().length === 0, 'finished animation without fill listed');
+  a4.effect.updateTiming({ fill: 'forwards' });
+  a4.finish();
+  await frame();
+  check(same(other.getAnimations(), [a4]), 'finished animation with fill missing');
+  check(same(document.getAnimations(), [a2, a4]), 'document animations after changes');
+
+  // Replaying a finished animation brings it back in its original order.
+  a3.play();
+  check(same(box.getAnimations(), [a3]), 'replayed animation missing');
+  check(same(document.getAnimations(), [a2, a3, a4]), 'replayed animation out of order');
+
+  // A removed target leaves the document's list but still reports its
+  // animation: the document asks whether the target is in the document, and
+  // the element asks only for its own animations.
+  const el = document.createElement('div');
+  document.body.appendChild(el);
+  const a5 = el.animate([{ opacity: 1 }, { opacity: 0 }], 10000);
+  check(same(document.getAnimations(), [a2, a3, a4, a5]), 'animation on an attached element');
+  el.remove();
+  check(same(el.getAnimations(), [a5]), 'removed element lost its animation');
+  check(same(document.getAnimations(), [a2, a3, a4]), 'removed element still listed by the document');
+
+  // A null target is never listed, though the animation is registered with
+  // the document's timeline and is running.
+  const nullTarget = new Animation(new KeyframeEffect(null, [{ opacity: 1 }, { opacity: 0 }], 100), document.timeline);
+  nullTarget.play();
+  check(nullTarget.playState === 'running', 'null-target animation not running');
+  check(same(document.getAnimations(), [a2, a3, a4]), 'null-target animation listed by the document');
+
+  // Retargeting moves the animation from the old target's list to the new one.
+  const a6 = box.animate([{ opacity: 1 }, { opacity: 0 }], 10000);
+  check(same(box.getAnimations(), [a3, a6]), 'animation before retargeting');
+  // The effect target is read live, so the lists change at once, before any
+  // frame: an implementation that updated them only on a tick would fail here.
+  a6.effect.target = other;
+  check(same(box.getAnimations(), [a3]), 'retargeted animation still listed by the old target before a frame');
+  check(same(other.getAnimations(), [a4, a6]), 'retargeted animation missing from the new target before a frame');
+  check(same(document.getAnimations(), [a2, a3, a4, a6]), 'retargeted animation missing from the document before a frame');
+  await frame();
+  check(same(box.getAnimations(), [a3]), 'retargeted animation still listed by the old target');
+  check(same(other.getAnimations(), [a4, a6]), 'retargeted animation missing from the new target');
+  check(same(document.getAnimations(), [a2, a3, a4, a6]), 'retargeted animation missing from the document');
+  verdict('PASS');
+})().catch((e) => fail(e.message));
+</script>

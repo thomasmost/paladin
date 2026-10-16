@@ -28,3 +28,22 @@ WebExtension support and no scheduled work toward it. It is the most likely
 reason to revisit the engine choice; the crate isolation from Phase 1 is what
 limits the cost of that revisit. The upstream issues each phase depends on
 are tracked in `docs/upstream-issues.md`.
+
+## Next design plans
+
+The Servo fork and Web Animations plan
+(`docs/design-plans/2026-10-15-servo-fork-and-web-animations.md`) gave
+Paladin a way to carry engine patches. Two design plans follow it, in
+order, on the way to Phase 3:
+
+1. **Isolated worlds in Servo.** Run scripts against the page DOM from a
+   separate JavaScript global, either per-world DOM wrappers or a sandbox
+   global with filtering wrappers; an embedder API to run a script in a
+   named world of a frame, per-world `customElements`, `postMessage`
+   between worlds, a host message port, and user scripts moved into an
+   isolated world.
+2. **WebExtension runtime in Paladin.** Unpacked extension loading, the
+   Manifest V3 background service worker, the `chrome.*` subset Proton
+   Pass uses, popup and options pages, `web_accessible_resources`.
+   Acceptance: Proton Pass installs unpacked, signs in, autofills, and
+   saves a login.

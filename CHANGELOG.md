@@ -8,6 +8,15 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Added
 
+- Web Animations API: `element.animate()`, `Animation` playback (`play`,
+  `pause`, `cancel`, `finish`, `reverse`, `playbackRate`,
+  `updatePlaybackRate`, `currentTime`, `startTime`, `playState`,
+  `pending`, `ready`, `finished`, `onfinish`, `oncancel`),
+  `KeyframeEffect` options, property-indexed keyframes and
+  `getComputedTiming()`, and `getAnimations()` on elements and the
+  document. Script animations are sampled by the style system each frame
+  like CSS animations.
+  Implemented as patches carried in Paladin's Servo and stylo forks.
 - Cargo workspace with a Servo-free core crate, an engine crate, the `paladin`
   binary, and an `xtask` helper, with project conventions (README, CHANGELOG,
   CLAUDE.md, ROADMAP), the knight-on-pegasus logo with generated icons, and CI
@@ -36,6 +45,9 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Changed
 
+- Servo and stylo are built from Paladin's forks (`thomasmost/servo`
+  `dist/paladin-0.7.0`, `thomasmost/stylo` `dist/paladin-0.22.0`) so the
+  browser can carry its own engine patches.
 - New logo artwork: the knight-on-pegasus illustration in `assets/logo.png`
   replaces the hand-drawn vector mark, framed by the same white rounded
   tile. All icon sizes are regenerated from it; the small ones are

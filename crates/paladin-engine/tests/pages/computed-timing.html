@@ -1,0 +1,69 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>computed-timing</title>
+<div id="box" style="width:50px;height:50px;background:teal"></div>
+<script>
+let settled = false;
+const verdict = (title) => { if (!settled) { settled = true; document.title = title; } };
+const fail = (reason) => verdict('FAIL: ' + reason);
+addEventListener('error', (event) => fail(event.message));
+setTimeout(() => fail('did not settle within 5s'), 5000);
+const check = (condition, what) => { if (!condition) throw new Error(what); };
+
+(async () => {
+  const box = document.getElementById('box');
+
+  // Specified vs computed timing with no animation.
+  const bare = new KeyframeEffect(box, null, 500);
+  check(bare.getTiming().duration === 500, 'bare duration');
+  check(bare.getTiming().fill === 'auto', 'bare fill is ' + bare.getTiming().fill);
+  check(bare.getComputedTiming().fill === 'none', 'bare computed fill');
+  check(bare.getComputedTiming().localTime === null, 'bare localTime');
+  check(bare.getComputedTiming().progress === null, 'bare progress');
+  check(bare.getComputedTiming().endTime === 500, 'bare endTime');
+  const auto = new KeyframeEffect(box, null);
+  check(auto.getTiming().duration === 'auto', 'auto duration');
+  check(auto.getComputedTiming().duration === 0, 'auto computed duration');
+
+  // Every option reaches the effect, and the computed values follow.
+  const anim = box.animate([{ opacity: 1 }, { opacity: 0 }], {
+    duration: 1000, delay: 100, endDelay: 50, iterations: 2, iterationStart: 0.25,
+    direction: 'alternate', easing: 'ease-in-out', fill: 'both',
+  });
+  anim.pause();
+  anim.currentTime = 600;
+  await anim.ready;
+  const t = anim.effect.getComputedTiming();
+  check(t.duration === 1000, 'duration ' + t.duration);
+  check(t.delay === 100, 'delay ' + t.delay);
+  check(t.endDelay === 50, 'endDelay ' + t.endDelay);
+  check(t.iterations === 2, 'iterations ' + t.iterations);
+  check(t.iterationStart === 0.25, 'iterationStart ' + t.iterationStart);
+  check(t.direction === 'alternate', 'direction ' + t.direction);
+  check(t.easing === 'ease-in-out', 'easing ' + t.easing);
+  check(t.fill === 'both', 'fill ' + t.fill);
+  check(t.activeDuration === 2000, 'activeDuration ' + t.activeDuration);
+  check(t.endTime === 2150, 'endTime ' + t.endTime);
+  check(t.localTime === 600, 'localTime ' + t.localTime);
+  check(t.currentIteration === 0, 'currentIteration ' + t.currentIteration);
+  // active time 500 of 1000, plus iterationStart 0.25: directed progress
+  // 0.75, through cubic-bezier(0.42, 0, 0.58, 1) is about 0.871.
+  check(Math.abs(t.progress - 0.871) < 0.01, 'progress ' + t.progress);
+
+  // updateTiming() validates and applies.
+  let threw = false;
+  try { anim.effect.updateTiming({ iterations: -1 }); } catch (e) { threw = e instanceof TypeError; }
+  check(threw, 'negative iterations did not throw a TypeError');
+  anim.effect.updateTiming({ duration: 200, fill: 'none' });
+  check(anim.effect.getTiming().duration === 200, 'updated duration');
+  check(anim.effect.getComputedTiming().progress === null, 'fill none past the end');
+  // Paused wins over finished in the play state calculation.
+  check(anim.playState === 'paused', 'playState after shortening is ' + anim.playState);
+  anim.play();
+  check(anim.playState === 'running', 'playState after replay is ' + anim.playState);
+  await anim.finished;
+  check(anim.playState === 'finished', 'playState after the shortened run is ' + anim.playState);
+
+  verdict('PASS');
+})().catch((e) => fail(e.message));
+</script>
