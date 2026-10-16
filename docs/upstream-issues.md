@@ -300,7 +300,8 @@ Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
   effect construction only; sampling follows in later patches.
   Upstream: servo/servo#36950.
 - **S13 (Web Animations API), stylo half.** `thomasmost/stylo`
-  `paladin/0.22.0`: "Add script-driven animations to ElementAnimationSet".
+  `paladin/0.22.0`: "Add script-driven animations to ElementAnimationSet",
+  "Test equal-offset script keyframes and the cancel dirty flag".
   Keyframe resolution and sampling for script animations. No caller yet;
   a later Servo-side patch pushes keyframes and progress into it.
 

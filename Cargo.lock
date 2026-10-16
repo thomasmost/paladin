@@ -241,7 +241,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -252,7 +252,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1672,7 +1672,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2080,7 +2080,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5111,7 +5111,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d8fae84b431384b68627d0f9b3b1245fcf9f46f6c0e3dc902e9dce64edd1967"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6205,7 +6205,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6262,7 +6262,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6435,7 +6435,7 @@ dependencies = [
 [[package]]
 name = "selectors"
 version = "0.41.0"
-source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8a352776473d3088ef577a241a3feded63e46213"
+source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8c858e76edafafe2d313c7cc9ff3b148ed205a98"
 dependencies = [
  "bitflags 2.13.2",
  "cssparser",
@@ -8102,7 +8102,7 @@ dependencies = [
 [[package]]
 name = "servo_arc"
 version = "0.5.0"
-source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8a352776473d3088ef577a241a3feded63e46213"
+source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8c858e76edafafe2d313c7cc9ff3b148ed205a98"
 dependencies = [
  "serde",
  "stable_deref_trait",
@@ -8369,7 +8369,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8506,7 +8506,7 @@ dependencies = [
 [[package]]
 name = "stylo"
 version = "0.22.0"
-source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8a352776473d3088ef577a241a3feded63e46213"
+source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8c858e76edafafe2d313c7cc9ff3b148ed205a98"
 dependencies = [
  "app_units",
  "arrayvec",
@@ -8562,7 +8562,7 @@ dependencies = [
 [[package]]
 name = "stylo_atoms"
 version = "0.22.0"
-source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8a352776473d3088ef577a241a3feded63e46213"
+source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8c858e76edafafe2d313c7cc9ff3b148ed205a98"
 dependencies = [
  "string_cache",
  "string_cache_codegen",
@@ -8571,7 +8571,7 @@ dependencies = [
 [[package]]
 name = "stylo_derive"
 version = "0.22.0"
-source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8a352776473d3088ef577a241a3feded63e46213"
+source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8c858e76edafafe2d313c7cc9ff3b148ed205a98"
 dependencies = [
  "darling 0.20.11",
  "proc-macro2",
@@ -8583,7 +8583,7 @@ dependencies = [
 [[package]]
 name = "stylo_dom"
 version = "0.22.0"
-source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8a352776473d3088ef577a241a3feded63e46213"
+source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8c858e76edafafe2d313c7cc9ff3b148ed205a98"
 dependencies = [
  "bitflags 2.13.2",
  "stylo_malloc_size_of",
@@ -8592,7 +8592,7 @@ dependencies = [
 [[package]]
 name = "stylo_malloc_size_of"
 version = "0.22.0"
-source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8a352776473d3088ef577a241a3feded63e46213"
+source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8c858e76edafafe2d313c7cc9ff3b148ed205a98"
 dependencies = [
  "app_units",
  "cssparser",
@@ -8610,7 +8610,7 @@ dependencies = [
 [[package]]
 name = "stylo_static_prefs"
 version = "0.22.0"
-source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8a352776473d3088ef577a241a3feded63e46213"
+source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8c858e76edafafe2d313c7cc9ff3b148ed205a98"
 dependencies = [
  "toml 1.1.8+spec-1.1.0",
 ]
@@ -8618,7 +8618,7 @@ dependencies = [
 [[package]]
 name = "stylo_traits"
 version = "0.22.0"
-source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8a352776473d3088ef577a241a3feded63e46213"
+source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8c858e76edafafe2d313c7cc9ff3b148ed205a98"
 dependencies = [
  "app_units",
  "bitflags 2.13.2",
@@ -8786,7 +8786,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.5",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8971,7 +8971,7 @@ checksum = "fd3ca314f692efd6c868f8408f53fe444634a845f96c028b97d35f6a1f79f0ee"
 [[package]]
 name = "to_shmem"
 version = "0.6.0"
-source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8a352776473d3088ef577a241a3feded63e46213"
+source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8c858e76edafafe2d313c7cc9ff3b148ed205a98"
 dependencies = [
  "cssparser",
  "servo_arc",
@@ -8984,7 +8984,7 @@ dependencies = [
 [[package]]
 name = "to_shmem_derive"
 version = "0.2.0"
-source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8a352776473d3088ef577a241a3feded63e46213"
+source = "git+https://github.com/thomasmost/stylo.git?branch=dist%2Fpaladin-0.22.0#8c858e76edafafe2d313c7cc9ff3b148ed205a98"
 dependencies = [
  "darling 0.20.11",
  "proc-macro2",
@@ -10107,7 +10107,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

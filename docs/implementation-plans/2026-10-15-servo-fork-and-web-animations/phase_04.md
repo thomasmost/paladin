@@ -66,6 +66,13 @@ the Animations cascade origin, exemption from cancellation) stands.
   `cubic-bezier(.5, -.5, .5, 1.5)`) yields values outside 0..1, which the
   spec extrapolates from the first or last keyframe interval. The sampler
   clamps to the end keyframes instead.
+- **The first keyframe's easing covers the implicit 0 interval.** When the
+  first keyframe omits a property, its value comes from the base style, but
+  the interval from 0 to the next keyframe that sets that property keeps the
+  first keyframe's easing. Web Animations section 5.3 gives the implicit 0
+  keyframe a linear easing instead. The CSS animation path in stylo already
+  behaves this way, so the two paths agree. Accepted: it only shows when the
+  first keyframe has a non-linear easing and omits a property.
 - **`cancel_all_animations` clears script animations too** (node removed
   from the document, or a node rooted for a CSS animation or transition
   that is no longer rendered). The Servo side notices the missing entry on
