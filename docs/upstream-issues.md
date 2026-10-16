@@ -299,6 +299,10 @@ Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
   properties". Timing model and
   effect construction only; sampling follows in later patches.
   Upstream: servo/servo#36950.
+- **S13 (Web Animations API), stylo half.** `thomasmost/stylo`
+  `paladin/0.22.0`: "Add script-driven animations to ElementAnimationSet".
+  Keyframe resolution and sampling for script animations. No caller yet;
+  a later Servo-side patch pushes keyframes and progress into it.
 
 ## Resolved
 
