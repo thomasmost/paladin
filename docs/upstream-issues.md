@@ -40,7 +40,7 @@ or starts with the workaround noted in the entry.
   - Ellipsis on overflowing titles and labels:
     [S4](#s4-text-overflow-unsupported).
   - Sites that call `element.animate()` without feature detection
-    (bsky.app): [S13](#s13-web-animations-api-unimplemented).
+    (bsky.app): [Carried in the fork: Web Animations](#carried-in-the-fork).
   - Clean stderr on exit: [S6](#s6-memory-profiler-warnings-on-exit).
   - Quiet `cargo build` on macOS:
     [T1](#t1-__eh_frame-section-too-large-linker-warning-on-macos).
@@ -209,33 +209,6 @@ or starts with the workaround noted in the entry.
 - **Blocks:** in-process profiles, as an alternative route to resolving
   [S7](#s7-no-profile-concept-site-data-is-per-process).
 
-### S13: Web Animations API unimplemented
-
-- **Upstream:** [servo/servo#36950][36950] (open, "Implement
-  WebAnimations"; a contributor has an in-progress branch since 2026-04);
-  [servo/servo#44174][44174] (open) is the bsky.app report.
-- **What it is:** `Element.animate()`, `Animation`, and `KeyframeEffect`
-  sit behind the `dom_web_animations_enabled` pref, which is off by
-  default (servo-config-0.7.0, `prefs.rs`). With it off, `element.animate`
-  is undefined. With it on, the interface is a skeleton:
-  `Animation.webidl` comments out `play()`, `cancel()`, `finish()`,
-  `finished`, `onfinish`, and `currentTime`, and `Element::Animate` skips
-  the step that plays the animation (servo-script-0.7.0,
-  `dom/element/element.rs`). `getAnimations()` is missing too.
-- **Effect:** pages that call `element.animate()` throw `t.animate is not a
-  function`, which Paladin logs as an ERROR from
-  `paladin_engine::delegate`. bsky.app breaks in a critical path; the
-  upstream issues also name airbnb.com and beatleader.com.
-- **Workaround:** none. Turning the pref on only moves the exception to the
-  next missing member and defeats sites that feature-detect `animate` and
-  fall back to CSS. Injecting the web-animations-js polyfill through
-  `UserContentManager` is possible (suggested in #44174) but is feature
-  work for one API.
-- **Blocks:** nothing on the roadmap; a README Known limitations entry.
-- **When it lands:** check whether Servo enables the pref by default; if
-  not, decide whether to set it in `Engine`'s `Preferences`. Load bsky.app
-  and remove the README entry.
-
 ## egui and winit
 
 None yet. The IME item looked like one; see Checked and not upstream.
@@ -286,21 +259,30 @@ Kept so nobody waits on upstream for them.
 Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
 (`paladin/0.22.0`), each listed against the upstream issue it addresses.
 
-- **S13 (Web Animations API), partial.** `thomasmost/servo`
-  `paladin/0.7.0`: "script: add the Web Animations timing calculations",
-  "script: add AnimationPlaybackEvent", "script: implement the Animation
-  timing model", "script: finish Element.animate()", "script: request a
-  rendering update for queued animation events", "script: tick script
-  animations on their own timeline", "script: use expect for the unused
-  sequence number", "script: tidy the simple iteration progress check and
-  event queue note", "script: clarify why the animation sequence number is
-  unused", "script: complete KeyframeEffect construction", "script:
-  propagate exceptions and follow the spec order when reading keyframe
-  properties", "script: sample script animations through stylo", "script:
-  resample when an animation's effect, target or time changes", "script:
-  resample after a playback rate change and correct the unrendered-target
-  note".
-  Upstream: servo/servo#36950.
+- **Web Animations API (was S13).** Upstream servo/servo#36950 and #44174:
+  Servo 0.7.0 ships the API behind `dom_web_animations_enabled` with the
+  playback and sampling halves unimplemented. Carried as `thomasmost/servo`
+  `paladin/0.7.0` (15 patch commits, oldest first): "script: add the Web
+  Animations timing calculations", "script: add AnimationPlaybackEvent",
+  "script: implement the Animation timing model", "script: finish
+  Element.animate()", "script: request a rendering update for queued
+  animation events", "script: tick script animations on their own timeline",
+  "script: use expect for the unused sequence number", "script: tidy the
+  simple iteration progress check and event queue note", "script: clarify
+  why the animation sequence number is unused", "script: complete
+  KeyframeEffect construction", "script: propagate exceptions and follow the
+  spec order when reading keyframe properties", "script: sample script
+  animations through stylo", "script: resample when an animation's effect,
+  target or time changes", "script: resample after a playback rate change
+  and correct the unrendered-target note", "script: implement
+  Element.getAnimations() and Document.getAnimations()"; and
+  `thomasmost/stylo` `paladin/0.22.0` (2 patch commits, oldest first):
+  "Add script-driven animations to ElementAnimationSet", "Test equal-offset
+  script keyframes and the cancel dirty flag". Paladin enables the pref in
+  `Engine`. Not covered: `CSSAnimation`/`CSSTransition` objects,
+  `commitStyles`, `persist`, replace-state removal, pseudo-element targets,
+  shadow-root `getAnimations`. On each Servo bump check whether upstream has
+  landed any of #36950's follow-ups and drop the overlapping patches.
   Known gaps in this patch set, for a later phase to pick up:
   - **Replaced animations are never removed.** "Remove replaced animations"
     (update animations and send events, step 2) is not implemented, so a
@@ -312,31 +294,26 @@ Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
     `animate()`, `currentTime`, `effect.setKeyframes()`, `effect.target`,
     `effect.composite` or `updateTiming()` reads the sample of the previous
     frame. Pages wait a frame or a timer before they read the new value.
-  - **Unrendered targets.** A target that is not rendered is not dirtied
-    for its sampled value, so hidden animations on targets that are not
-    rooted do not restart restyles. Layout cancels a stylo set only for a rooted node (one that has had CSS
-    animations or transitions while its set existed; it stays rooted while
-    its set is non-empty or an event for it is pending) that has stopped
-    rendering. A script-only target is never rooted, so it keeps its entry
-    and only its progress is set on each tick. A rooted target loses its
-    set, script animations included, in the reflow after it stops
-    rendering. The next tick pushes its keyframes again, and once its
-    cancel events are sent it is unrooted and behaves like a script-only
-    target. A set that still holds a finished transition stays non-empty,
-    so that target stays rooted, is dirtied by the animation manager and
-    pays one keyframe rebuild per tick while hidden. Accepted: a running
-    animation on a `display: none` target that is not rooted keeps its
-    progress set each tick, without a restyle, until it finishes. Showing
-    the target again is a display change,
-    which triggers a rendering update, and that update samples script
-    animations before reflow, so the value is current after the next frame.
-    A synchronous `getComputedStyle` read still sees the previous tick (see
-    "Sampling is per tick"). The script side has no hook for display changes.
-- **S13 (Web Animations API), stylo half.** `thomasmost/stylo`
-  `paladin/0.22.0`: "Add script-driven animations to ElementAnimationSet",
-  "Test equal-offset script keyframes and the cancel dirty flag".
-  Keyframe resolution and sampling for script animations. Its caller is
-  the Servo-side patch "script: sample script animations through stylo".
+  - **Unrendered targets.** A target that is not rendered is not dirtied for
+    its sampled value, so hidden animations on targets that are not rooted
+    do not restart restyles. Layout cancels a stylo set only for a rooted
+    node (one that has had CSS animations or transitions while its set
+    existed; it stays rooted while its set is non-empty or an event for it
+    is pending) that has stopped rendering. A script-only target is never
+    rooted, so it keeps its entry and only its progress is set on each
+    tick. A rooted target loses its set, script animations included, in the
+    reflow after it stops rendering. The next tick pushes its keyframes
+    again, and once its cancel events are sent it is unrooted and behaves
+    like a script-only target. A set that still holds a finished transition
+    stays non-empty, so that target stays rooted, is dirtied by the
+    animation manager and pays one keyframe rebuild per tick while hidden.
+    Accepted: a running animation on a `display: none` target that is not
+    rooted keeps its progress set each tick, without a restyle, until it
+    finishes. Showing the target again is a display change, which triggers
+    a rendering update, and that update samples script animations before
+    reflow, so the value is current after the next frame. A synchronous
+    `getComputedStyle` read still sees the previous tick (see "Sampling is
+    per tick"). The script side has no hook for display changes.
 
 ## Resolved
 
@@ -346,10 +323,8 @@ it up. None yet.
 [13263]: https://github.com/servo/servo/issues/13263
 [13702]: https://github.com/servo/servo/issues/13702
 [13925]: https://github.com/servo/servo/issues/13925
-[36950]: https://github.com/servo/servo/issues/36950
 [40444]: https://github.com/servo/servo/issues/40444
 [43888]: https://github.com/servo/servo/pull/43888
-[44174]: https://github.com/servo/servo/issues/44174
 [44426]: https://github.com/servo/servo/issues/44426
 [46562]: https://github.com/servo/servo/issues/46562
 [47126]: https://github.com/servo/servo/issues/47126
