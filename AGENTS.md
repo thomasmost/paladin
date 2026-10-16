@@ -117,7 +117,9 @@ Run from the repo root:
   Servo's own `Cargo.lock` (0.7.0 needs
   `cargo update -p pkcs1 --precise 0.8.0-rc.4`), rebuild, run the manual
   checklist in `README.md`, and re-check the "Carried in the fork" entries
-  in `docs/upstream-issues.md`.
+  in `docs/upstream-issues.md`. The first bump also squashes the review
+  fix-up commits of the Web Animations series into one commit per logical
+  change before republishing (the list is in that entry).
 - **One `Engine` per process.** Servo's options are process-global, so each
   engine test binary (`headless`, `web_animations`) holds a single test
   function that builds one engine.
@@ -125,9 +127,8 @@ Run from the repo root:
   `crates/paladin-engine/tests/pages/` sets `document.title` to `PASS` or
   `FAIL: <reason>` exactly once, with an error listener and, if it waits for
   frames or events, a timeout that fails it (the harness gives up after
-  120 s). Pages are not
-  discovered: add a new one to `PAGES` in `tests/web_animations.rs`, or it
-  never runs.
+  120 s). Pages are not discovered: add a new one to `PAGES` in
+  `tests/web_animations.rs`, or it never runs.
 - **The style-thread stack size is a build-time setting.** `.cargo/config.toml`
   exports `SERVO_STYLE_THREAD_STACK_SIZE_KB=8192` to every cargo invocation
   run from inside the repo; stylo reads it with `option_env!`, and its 512 KB

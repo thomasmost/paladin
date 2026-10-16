@@ -259,9 +259,10 @@ Kept so nobody waits on upstream for them.
 Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
 (`paladin/0.22.0`), each listed against the upstream issue it addresses.
 
-- **Web Animations API (was S13).** Upstream servo/servo#36950 and #44174:
-  Servo 0.7.0 ships the API behind `dom_web_animations_enabled` with the
-  playback and sampling halves unimplemented. Carried as `thomasmost/servo`
+- **Web Animations API (was S13).** Upstream [servo/servo#36950][36950] and
+  [#44174][44174]: Servo 0.7.0 ships the API behind
+  `dom_web_animations_enabled` with the playback and sampling halves
+  unimplemented. Carried as `thomasmost/servo`
   `paladin/0.7.0` (17 patch commits, oldest first): "script: add the Web
   Animations timing calculations", "script: add AnimationPlaybackEvent",
   "script: implement the Animation timing model", "script: finish
@@ -290,10 +291,32 @@ Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
   never registered, so they are not returned either. An animation moved off
   a document's timeline stays listed by that document's `getAnimations()`
   until the document's next tick, because the filter does not check the
-  timeline. On each
-  Servo bump check whether upstream has
-  landed any of #36950's follow-ups and drop the overlapping patches.
+  timeline. On each Servo bump check whether upstream has landed any of
+  #36950's follow-ups and drop the overlapping patches. The series carries
+  its review fix-ups as separate commits (about half of the 17); squash
+  them into one commit per logical change (timing calculations, playback
+  event, timing model, `animate()`, event and rendering-update plumbing,
+  `KeyframeEffect` construction, stylo sampling, `getAnimations()`) during
+  the 0.8.0 rebase, before republishing, so later rebases stay mechanical.
   Known gaps in this patch set, for a later phase to pick up:
+  - **Keyframes resolve once.** stylo resolves a script animation's
+    keyframes against the element's style on the first restyle after they
+    are pushed and not again; later changes to the base style (`em` or
+    `var()` values, the implicit 0 and 1 keyframes, the underlying value
+    for `add`) are not picked up until the keyframes are pushed again. CSS
+    animations in stylo re-resolve only on `animation-*` changes, so the
+    precision matches for the common case.
+  - **Overshooting easings are clamped.** The script side pushes the
+    transformed progress; an effect easing that overshoots (for example
+    `cubic-bezier(.5, -.5, .5, 1.5)`) yields progress outside 0..1, which
+    the spec extrapolates from the first or last keyframe interval. stylo's
+    sampler clamps to the end keyframes instead.
+  - **The first keyframe's easing covers the implicit 0 interval.** When
+    the first keyframe omits a property, its value comes from the base
+    style but the interval up to the next keyframe that sets the property
+    keeps the first keyframe's easing; the spec gives the implicit 0
+    keyframe a linear easing. stylo's CSS animation path behaves the same
+    way.
   - **Replaced animations are never removed.** "Remove replaced animations"
     (update animations and send events, step 2) is not implemented, so a
     finished `fill: forwards` animation stays in the manager's list and in
@@ -330,6 +353,8 @@ Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
 Entries move here once upstream has shipped the fix and Paladin has picked
 it up. None yet.
 
+[36950]: https://github.com/servo/servo/issues/36950
+[44174]: https://github.com/servo/servo/issues/44174
 [13263]: https://github.com/servo/servo/issues/13263
 [13702]: https://github.com/servo/servo/issues/13702
 [13925]: https://github.com/servo/servo/issues/13925
