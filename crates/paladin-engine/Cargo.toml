@@ -25,6 +25,10 @@ servo = { version = "=0.7.0", default-features = false, features = [
 ] }
 url = { workspace = true }
 
+[target.'cfg(unix)'.dependencies]
+# The content process watches its parent (see `run_content_process`).
+libc = "0.2"
+
 [target.'cfg(target_os = "windows")'.dependencies]
 # ANGLE's EGL instead of WGL, as Servo's shell does. Produces libEGL.dll and
 # libGLESv2.dll, which `cargo xtask angle-dlls` copies next to the binaries.

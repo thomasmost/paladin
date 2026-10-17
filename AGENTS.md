@@ -30,7 +30,8 @@ Local setup is in `README.md`.
 
 Run from the repo root:
 
-- `cargo run -- [--profile <name>] [<url>...]` — run the browser. The
+- `cargo run -- [--profile <name>] [--single-process] [<url>...]` — run
+  the browser (`--single-process`: every tab in the browser process). The
   workspace sets `default-members = ["crates/paladin"]`, so plain `cargo
   build`/`cargo test` touch only the binary; pass `--workspace` for the rest.
 - `cargo test --workspace` — unit tests plus the two engine test binaries,
@@ -147,6 +148,16 @@ Run from the repo root:
 - **Every user action is a `Command`.** New chrome controls and shortcuts add
   a `Command` (and a `CommandKind` if it needs a hotkey), never a direct
   engine call.
+- **Tabs run in content processes.** `Engine::new(.., multiprocess: true)`
+  sets Servo's `multiprocess` option; Servo then starts the current
+  executable with `--content-process <token>` for each script thread, and
+  `main` routes that argument to `paladin_engine::run_content_process`
+  before touching profiles, logging, or windows. The processes are
+  unsandboxed (`sandbox: false`; Servo's sandbox is Linux and macOS only).
+  A content process that dies makes the constellation's next message to
+  it fail, which Servo treats like a panic: crash page plus
+  `notify_crashed`. The engine test binaries pass `false`: they do not
+  handle the argument. `--single-process` is the debugging escape hatch.
 - **The engine owns the logger and the panic hook.** `Engine::new` installs
   Servo's logger (`Servo::setup_logging`: `env_logger` plus a forwarder to
   the constellation) and a panic hook that logs the panic message at error

@@ -49,7 +49,8 @@ Servo and stylo are built from Paladin's forks (`thomasmost/servo`,
 setup is needed. `CLAUDE.md` describes how to work on the forks.
 
 1. **Build and run:** `cargo run` opens a window at the homepage. Pass URLs
-   to open them as tabs, or `--profile <name>` to use another profile.
+   to open them as tabs, `--profile <name>` to use another profile, or
+   `--single-process` to keep every tab in the browser process.
 2. **Windows only, before running:** `cargo xtask angle-dlls` copies
    `libEGL.dll` and `libGLESv2.dll` next to the executables; without them
    the binary does not start.
@@ -96,12 +97,14 @@ or engine glue. Each item must pass.
    clicking a tab title switches tabs and the address bar follows; "×" and
    middle-click close a tab and the neighbour to the right becomes active;
    closing the last tab closes the window and the process exits.
-5. **Crashed tab.** A page whose script thread panics (a Servo bug, not
-   something a page can do on purpose) shows the tab's error panel with the
-   panic message, the other tabs keep working, and the terminal shows
-   `tab crashed: <reason>`; Back, Forward, and Reload clear the panel. A
-   native crash (an access violation) still ends the process: Servo runs
-   every tab in this one process on Windows and macOS.
+5. **Crashed tab.** Each tab's script thread (DOM, JavaScript, layout)
+   runs in a content process, a second `paladin` process. A page whose
+   script thread panics or crashes natively (a Servo bug, not something a
+   page can do on purpose) shows the tab's error panel with the reason, the
+   other tabs keep working, and the terminal shows `tab crashed: <reason>`;
+   Back, Forward, and Reload clear the panel. `--single-process` runs every
+   tab in the browser process instead, for debugging the engine; a crash
+   then ends the browser.
 6. **Resize and HiDPI.** Resize the window: the page stays aligned under the
    toolbar with no gap or stretching. Drag the window to a display with a
    different scale factor (or change the display scaling): text stays sharp

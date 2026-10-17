@@ -58,6 +58,8 @@ pub struct App {
     settings_window: Option<SettingsWindow>,
     pending_actions: Vec<EngineAction>,
     engine: Option<Engine>,
+    /// Run each tab's script thread in a content process (see `Engine::new`).
+    multiprocess: bool,
     waker: Arc<WinitWaker>,
     exiting: bool,
     engine_failed: bool,
@@ -73,6 +75,7 @@ impl App {
         browser: Browser,
         keymap: Keymap,
         initial_actions: Vec<EngineAction>,
+        multiprocess: bool,
         event_loop: &EventLoop<AppEvent>,
     ) -> App {
         App {
@@ -82,6 +85,7 @@ impl App {
             settings_window: None,
             pending_actions: initial_actions,
             engine: None,
+            multiprocess,
             waker: Arc::new(WinitWaker(Mutex::new(event_loop.create_proxy()))),
             exiting: false,
             engine_failed: false,
@@ -348,7 +352,7 @@ impl ApplicationHandler<AppEvent> for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.engine.is_none() && !self.exiting {
             let servo_dir = self.browser.profile.servo_dir();
-            match Engine::new(&servo_dir, self.waker.clone()) {
+            match Engine::new(&servo_dir, self.waker.clone(), self.multiprocess) {
                 Ok(engine) => self.engine = Some(engine),
                 Err(e) => {
                     report_fatal(&format!(
@@ -368,6 +372,9 @@ impl ApplicationHandler<AppEvent> for App {
                 self.browser.profile.name,
                 self.browser.profile.dir.display()
             );
+            if self.multiprocess {
+                crate::process::bind_children_to_this_process();
+            }
             icon::set_dock_icon();
             let actions = std::mem::take(&mut self.pending_actions);
             self.perform_all(actions, event_loop);

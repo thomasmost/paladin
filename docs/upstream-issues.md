@@ -48,6 +48,8 @@ or starts with the workaround noted in the entry.
     [S5](#s5-style-threads-overflow-their-512-kb-stack-resolved-in-paladin).
   - Windows release builds crash on wikipedia.org (the `<select>` value
     setter): [Carried in the fork: select value setter](#carried-in-the-fork).
+  - A tab whose content process died stays frozen: [Carried in the fork:
+    exited content process](#carried-in-the-fork).
   - Packaging on both hosts: worked around in
     [T2](#t2-cargo-packager-0118-fails-on-formats-the-host-cannot-build).
   - Debug build links on Windows: worked around in
@@ -394,6 +396,23 @@ Patches on `thomasmost/servo` (`paladin/0.7.0`) and `thomasmost/stylo`
   `opt-level = "s"`) also hides the bug on the unpatched 0.7.0 (a 105 MB
   instead of 142 MB binary, 30 minutes instead of 12 to build on a 16-core
   desktop); Paladin keeps the plain release profile and the patch.
+
+- **An exited content process leaves its tab frozen.** Upstream: no issue
+  found. In multiprocess mode the constellation only reaps a content
+  process whose lifeline closed; its pipelines stay registered, input for
+  them is dropped as "unknown pipeline" without a send error, and the
+  embedder is never told, so the webview keeps its last frame until the
+  constellation happens to send to the dead process. Carried as
+  `thomasmost/servo` `paladin/0.7.0` "constellation: report an exited
+  content process as a crash of its event loop": `ProcessManager` keeps
+  the script event loop id of each process, and a lifeline that closes
+  while that event loop still has pipelines (outside shutdown) is handled
+  like a panic report from it (crash page, `notify_crashed`). Verified by
+  killing a content process from outside. Worth proposing upstream with
+  the Windows multiprocess findings: unsandboxed content processes work on
+  Windows with Servo 0.7.0 (`spawn_multiprocess` re-runs the executable
+  with `--content-process <token>`), the only Paladin-side pieces being
+  the argument routing and a job object for cleanup.
 
 ## Resolved
 

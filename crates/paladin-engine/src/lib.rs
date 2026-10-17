@@ -20,6 +20,6 @@ mod input;
 pub use dpi::PhysicalSize;
 pub use keyboard_types;
 
-pub use crate::engine::{Engine, EngineError, Waker};
+pub use crate::engine::{Engine, EngineError, Waker, run_content_process};
 pub use crate::host::{BlitFn, BlitRect, GlSurface, TabHost};
 pub use crate::input::{ButtonAction, EngineInput, KeyInput, MouseButton};

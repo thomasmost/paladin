@@ -10,6 +10,7 @@ mod fatal;
 mod icon;
 mod input;
 mod keyutils;
+mod process;
 mod routing;
 mod settings_window;
 mod window;
@@ -32,6 +33,15 @@ struct Cli {
     /// Profile name; state lives under the per-user Paladin directory.
     #[arg(long, default_value = DEFAULT_PROFILE_NAME)]
     profile: String,
+    /// Run every tab in this process instead of one content process per
+    /// tab's script thread. A crash in a page then takes the browser down
+    /// with it; for debugging the engine.
+    #[arg(long)]
+    single_process: bool,
+    /// Passed by the browser process to the content processes it starts;
+    /// not for users.
+    #[arg(long, hide = true, value_name = "TOKEN")]
+    content_process: Option<String>,
     /// URLs to open, one tab each. With none, the homepage opens.
     urls: Vec<String>,
 }
@@ -46,6 +56,12 @@ fn main() -> ExitCode {
         unsafe { std::env::set_var("RUST_LOG", "info") };
     }
     let cli = Cli::parse();
+    if let Some(token) = cli.content_process {
+        // A content process: no profile, window, or engine of its own. See
+        // `paladin_engine::Engine::new`.
+        paladin_engine::run_content_process(token);
+        return ExitCode::SUCCESS;
+    }
 
     let profile = match Profile::resolve(&cli.profile) {
         Ok(p) => p,
@@ -114,7 +130,7 @@ fn main() -> ExitCode {
         }
     };
     event_loop.set_control_flow(ControlFlow::Wait);
-    let mut app = App::new(browser, keymap, actions, &event_loop);
+    let mut app = App::new(browser, keymap, actions, !cli.single_process, &event_loop);
     match event_loop.run_app(&mut app) {
         Ok(()) if app.started_cleanly() => ExitCode::SUCCESS,
         Ok(()) => ExitCode::FAILURE,

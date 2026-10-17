@@ -52,7 +52,20 @@ pub struct Engine {
 impl Engine {
     /// Start Servo with its cookies, local storage, and HTTP cache under
     /// `servo_config_dir` (the profile's `servo/` directory).
-    pub fn new(servo_config_dir: &Path, waker: Arc<dyn Waker>) -> Result<Engine, EngineError> {
+    ///
+    /// With `multiprocess`, Servo runs each tab's script thread (DOM, JS,
+    /// layout) in a content process that it starts by running the current
+    /// executable again with `--content-process <token>`, so the binary must
+    /// route that argument to [`run_content_process`] before doing anything
+    /// else. A content process that dies, from a native crash or a panic,
+    /// costs that tab its page (the constellation reports it as crashed, see
+    /// `notify_crashed`) and nothing else. Test binaries pass `false`: they
+    /// do not handle the argument.
+    pub fn new(
+        servo_config_dir: &Path,
+        waker: Arc<dyn Waker>,
+        multiprocess: bool,
+    ) -> Result<Engine, EngineError> {
         install_crypto_provider();
         install_panic_hook();
         std::fs::create_dir_all(servo_config_dir).map_err(|e| {
@@ -70,6 +83,10 @@ impl Engine {
             // `EngineEvent::TabCrashed`), closes that tab's pipeline, and
             // replaces it with a crash page; the other tabs keep running.
             hard_fail: false,
+            multiprocess,
+            // Servo's content process sandbox exists for Linux and macOS
+            // only; the content processes run unsandboxed everywhere.
+            sandbox: false,
             ..Opts::default()
         };
         // Servo reports start-up failures by panicking. Turn that into an
@@ -137,6 +154,45 @@ impl Drop for Engine {
         self.delegate.clear_pending();
     }
 }
+
+/// Run this process as one of Servo's content processes and return when it
+/// is done. `token` is the value of the `--content-process` argument Servo
+/// gave the process when it started it (see [`Engine::new`]). The process
+/// needs no profile, window, or engine: it connects back to the parent over
+/// IPC and takes its options and preferences from there. The panic hook is
+/// installed here too, so a panic on this process's script thread reaches
+/// the parent's constellation as a crash report rather than a dead tab.
+pub fn run_content_process(token: String) {
+    install_panic_hook();
+    exit_with_parent();
+    servo::run_content_process(token);
+}
+
+/// End this content process when the browser process is gone, so a browser
+/// that was killed or crashed natively leaves no orphans. On Windows the
+/// browser puts itself and its children in a job object that the kernel
+/// tears down with it (`paladin::process`), so nothing is needed here. On
+/// Unix an orphan is re-parented, which a thread polling the parent pid
+/// notices within a second.
+#[cfg(unix)]
+fn exit_with_parent() {
+    // SAFETY: `getppid` has no preconditions and cannot fail.
+    let parent = unsafe { libc::getppid() };
+    let _ = std::thread::Builder::new()
+        .name("ParentWatchdog".to_string())
+        .spawn(move || {
+            loop {
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                // SAFETY: as above.
+                if unsafe { libc::getppid() } != parent {
+                    std::process::exit(0);
+                }
+            }
+        });
+}
+
+#[cfg(not(unix))]
+fn exit_with_parent() {}
 
 /// Install the process panic hook Servo's crash reporting relies on, once.
 ///

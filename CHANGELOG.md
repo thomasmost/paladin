@@ -8,6 +8,21 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Added
 
+- Each tab's script thread (DOM, JavaScript, layout) runs in its own
+  content process, Servo's multiprocess mode: the browser starts a second
+  `paladin` process per script thread (with a hidden `--content-process`
+  argument) and talks to it over IPC. A panic or a native crash in a page
+  now shows that tab's error panel and leaves the rest of the browser
+  running. The processes are not sandboxed (Servo's sandbox exists for
+  Linux and macOS only). `--single-process` restores the old layout for
+  debugging the engine. On Windows the browser puts itself and its content
+  processes in a job object, so a browser that is killed or crashes
+  natively takes them with it; on Unix a content process exits when its
+  parent is gone. Servo itself only noticed a vanished content process
+  when it next sent to it, so its tab stayed frozen; Paladin's Servo fork
+  carries "constellation: report an exited content process as a crash of
+  its event loop", which reports it at once.
+
 - Web Animations API: `element.animate()`, `Animation` playback (`play`,
   `pause`, `cancel`, `finish`, `reverse`, `playbackRate`,
   `updatePlaybackRate`, `currentTime`, `startTime`, `playState`,

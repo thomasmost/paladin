@@ -19,7 +19,7 @@ impl Waker for NoopWaker {
 fn loads_a_data_url_headlessly() {
     let dir = tempfile::tempdir().expect("temp dir");
     let engine =
-        Engine::new(&dir.path().join("servo"), Arc::new(NoopWaker)).expect("engine starts");
+        Engine::new(&dir.path().join("servo"), Arc::new(NoopWaker), false).expect("engine starts");
     let mut host =
         TabHost::new_software(&engine, PhysicalSize::new(400, 300)).expect("software host");
 

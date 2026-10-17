@@ -89,7 +89,7 @@ fn wait_for_verdict(
 fn web_animations_pages_pass() {
     let dir = tempfile::tempdir().expect("temp dir");
     let engine =
-        Engine::new(&dir.path().join("servo"), Arc::new(NoopWaker)).expect("engine starts");
+        Engine::new(&dir.path().join("servo"), Arc::new(NoopWaker), false).expect("engine starts");
     let mut host =
         TabHost::new_software(&engine, PhysicalSize::new(400, 300)).expect("software host");
     let pages = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/pages");
