@@ -80,16 +80,49 @@ impl Tab {
     }
 }
 
-/// A browser window. Invariant: a window always has at least one tab and
-/// `active` names one of them. Closing the last tab closes the window.
+/// A browser window. Invariants: a window always has at least one tab,
+/// `active` names one of them, and `selected` holds `active` plus any other
+/// tabs of this window the user added to the selection (Ctrl-click,
+/// Shift-click). Closing the last tab closes the window.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Window {
     pub id: WindowId,
     pub tabs: Vec<Tab>,
     pub active: TabId,
+    pub selected: Vec<TabId>,
 }
 
 impl Window {
+    /// A window with one tab, which is active and selected.
+    pub fn with_tab(id: WindowId, tab: Tab) -> Window {
+        let active = tab.id;
+        Window {
+            id,
+            tabs: vec![tab],
+            active,
+            selected: vec![active],
+        }
+    }
+
+    pub fn is_selected(&self, tab: TabId) -> bool {
+        self.selected.contains(&tab)
+    }
+
+    /// The selected tabs in strip order. Always includes the active tab.
+    pub fn selection(&self) -> Vec<TabId> {
+        self.tabs
+            .iter()
+            .map(|t| t.id)
+            .filter(|id| self.selected.contains(id))
+            .collect()
+    }
+
+    /// Make `tab` (which must be one of this window's tabs) the only
+    /// selected tab. Does not change the active tab.
+    pub(crate) fn select_only(&mut self, tab: TabId) {
+        self.selected.clear();
+        self.selected.push(tab);
+    }
     pub fn index_of(&self, tab: TabId) -> Option<usize> {
         self.tabs.iter().position(|t| t.id == tab)
     }

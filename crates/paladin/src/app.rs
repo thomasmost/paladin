@@ -20,7 +20,9 @@ use paladin_core::{
     dispatch,
 };
 use paladin_engine::{Engine, Waker};
+use url::Url;
 use winit::application::ApplicationHandler;
+use winit::dpi::PhysicalPosition;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 
@@ -105,6 +107,37 @@ impl App {
 
     fn window_for_core_id(&mut self, id: WindowId) -> Option<&mut BrowserWindow> {
         self.windows.values_mut().find(|w| w.core_id() == id)
+    }
+
+    /// The command for tabs dragged out of `source` and dropped at `point`
+    /// (physical screen pixels): move them to the other browser window
+    /// under the pointer, to a new window when the pointer is outside every
+    /// browser window, and nothing when it is still over the source window
+    /// (tabs are not reordered by dragging).
+    fn tab_drop_command(
+        &self,
+        source: winit::window::WindowId,
+        tabs: Vec<TabId>,
+        point: PhysicalPosition<f64>,
+    ) -> Option<Command> {
+        if let Some(target) = self
+            .windows
+            .iter()
+            .find(|(id, w)| **id != source && w.contains_screen_point(point))
+        {
+            return Some(Command::MoveTabsToWindow {
+                tabs,
+                window: target.1.core_id(),
+            });
+        }
+        if self
+            .windows
+            .get(&source)
+            .is_some_and(|w| w.contains_screen_point(point))
+        {
+            return None;
+        }
+        Some(Command::MoveTabsToNewWindow(tabs))
     }
 
     fn run_commands(&mut self, commands: Vec<Command>, event_loop: &ActiveEventLoop) {
@@ -253,6 +286,18 @@ impl App {
                     Err(e) => log::error!("cannot open settings window: {e}"),
                 },
             },
+            EngineAction::OpenInProfile { profile, urls } => {
+                if let Err(e) = crate::process::open_in_profile(&profile, &urls) {
+                    let urls: Vec<&str> = urls.iter().map(Url::as_str).collect();
+                    let message = format!(
+                        "cannot start a browser for profile {profile:?} with {}: {e}",
+                        urls.join(" ")
+                    );
+                    log::error!("{message}");
+                    let actions = apply(&mut self.browser, &EngineEvent::EngineError(message));
+                    self.perform_all(actions, event_loop);
+                }
+            }
             EngineAction::Quit => {
                 self.exiting = true;
                 self.close_settings_window();
@@ -409,7 +454,13 @@ impl ApplicationHandler<AppEvent> for App {
             }
         } else if let Some(window) = self.windows.get_mut(&window_id) {
             let commands = window.handle_event(&self.browser, &self.keymap, &event);
+            let drop = window.take_tab_drop();
             self.run_commands(commands, event_loop);
+            if let Some((tabs, point)) = drop
+                && let Some(command) = self.tab_drop_command(window_id, tabs, point)
+            {
+                self.run_commands(vec![command], event_loop);
+            }
         }
         self.pump(event_loop);
         if !self.exiting {

@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use egui::{LayerId, PaintCallback};
 use egui_glow::{CallbackFn, EguiGlow};
-use paladin_core::{Browser, Command, Keymap, WindowId};
+use paladin_core::{Browser, Command, Keymap, TabId, WindowId};
 use paladin_engine::{
     BlitRect, Engine, EngineError, EngineInput, GlSurface, PhysicalSize, TabHost,
 };
@@ -121,6 +121,36 @@ impl BrowserWindow {
     pub fn focus_address_bar(&mut self) {
         self.chrome.focus_address = true;
         self.window.request_redraw();
+    }
+
+    /// The tabs a drag that ended in this window carried, with the drop
+    /// point in physical screen pixels (the pointer may have been outside
+    /// this window). Taken once. `None` if the window's position is not
+    /// known.
+    pub fn take_tab_drop(&mut self) -> Option<(Vec<TabId>, PhysicalPosition<f64>)> {
+        let drop = self.chrome.take_tab_drop()?;
+        let origin = self.window.inner_position().ok()?;
+        let scale = self.window.scale_factor();
+        Some((
+            drop.tabs,
+            PhysicalPosition::new(
+                f64::from(origin.x) + f64::from(drop.pointer.x) * scale,
+                f64::from(origin.y) + f64::from(drop.pointer.y) * scale,
+            ),
+        ))
+    }
+
+    /// Whether `point` (physical screen pixels) is over this window, frame
+    /// included. False if the window's position is not known.
+    pub fn contains_screen_point(&self, point: PhysicalPosition<f64>) -> bool {
+        let Ok(origin) = self.window.outer_position() else {
+            return false;
+        };
+        let size = self.window.outer_size();
+        point.x >= f64::from(origin.x)
+            && point.y >= f64::from(origin.y)
+            && point.x < f64::from(origin.x) + f64::from(size.width)
+            && point.y < f64::from(origin.y) + f64::from(size.height)
     }
 
     fn surface(&self) -> &GlSurface {
@@ -316,6 +346,13 @@ impl BrowserWindow {
         let active = model.active;
         let crashed = model.active_tab().crashed.clone();
         let engine_error = browser.engine_error.as_deref();
+        let others: Vec<(WindowId, String)> = browser
+            .windows
+            .iter()
+            .filter(|w| w.id != self.id)
+            .map(|w| (w.id, w.active_tab().display_title().to_string()))
+            .collect();
+        let profile = &browser.profile;
         let mut commands = Vec::new();
         let mut content_top_px = 0.0;
 
@@ -327,7 +364,15 @@ impl BrowserWindow {
             ..
         } = self;
         egui.run(window, |ui| {
-            commands = chrome::draw(ui, model, engine_error, chrome_state, keymap);
+            commands = chrome::draw(
+                ui,
+                model,
+                &others,
+                profile,
+                engine_error,
+                chrome_state,
+                keymap,
+            );
             let rect = ui.available_rect_before_wrap();
             let (top, size) = content_pixels(rect, ui.pixels_per_point());
             content_top_px = top;

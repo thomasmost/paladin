@@ -1,5 +1,37 @@
 //! Process-level housekeeping for the browser process.
 
+use std::io;
+
+use url::Url;
+
+/// Start another `paladin` for `profile` with `urls` as its tabs (the
+/// "Open in profile" tab menu). Another profile is another process:
+/// `docs/upstream-issues.md`, S7. The new browser is independent of this
+/// one: on Windows it leaves the job object that ties content processes
+/// to this browser (see [`bind_children_to_this_process`]).
+pub fn open_in_profile(profile: &str, urls: &[Url]) -> io::Result<()> {
+    let exe = std::env::current_exe()?;
+    let mut command = std::process::Command::new(exe);
+    command.arg("--profile").arg(profile);
+    for url in urls {
+        command.arg(url.as_str());
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        use windows_sys::Win32::System::Threading::CREATE_BREAKAWAY_FROM_JOB;
+        command.creation_flags(CREATE_BREAKAWAY_FROM_JOB);
+    }
+    let mut child = command.spawn()?;
+    // Reap it when it exits so it never lingers as a zombie on Unix.
+    std::thread::Builder::new()
+        .name("ProfileReaper".to_string())
+        .spawn(move || {
+            let _ = child.wait();
+        })?;
+    Ok(())
+}
+
 /// Make every process this one starts die with it.
 ///
 /// Servo's content processes are children of the browser process (see
@@ -22,9 +54,9 @@ pub fn bind_children_to_this_process() {
 
     use windows_sys::Win32::Foundation::GetLastError;
     use windows_sys::Win32::System::JobObjects::{
-        AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
-        SetInformationJobObject,
+        AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_BREAKAWAY_OK,
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        JobObjectExtendedLimitInformation, SetInformationJobObject,
     };
     use windows_sys::Win32::System::Threading::GetCurrentProcess;
 
@@ -41,7 +73,10 @@ pub fn bind_children_to_this_process() {
             return;
         }
         let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = zeroed();
-        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        // BREAKAWAY_OK lets a browser started for another profile
+        // (`open_in_profile`) opt out; content processes stay in.
+        info.BasicLimitInformation.LimitFlags =
+            JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_BREAKAWAY_OK;
         if SetInformationJobObject(
             job,
             JobObjectExtendedLimitInformation,

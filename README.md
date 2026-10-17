@@ -97,6 +97,21 @@ or engine glue. Each item must pass.
    clicking a tab title switches tabs and the address bar follows; "×" and
    middle-click close a tab and the neighbour to the right becomes active;
    closing the last tab closes the window and the process exits.
+   **Selection.** With three tabs open, Cmd-click (Ctrl-click on Windows)
+   the first: it gets a tinted fill while the third stays active; Shift-click
+   the first from the third selects all three; a plain click leaves only
+   the clicked tab selected. Right-click a selected tab: the menu offers
+   "Close 3 tabs", "Close other tabs" (disabled when all are selected),
+   "Move 3 tabs to new window" (same), "Move 3 tabs to window" (disabled
+   with one window), and "Open 3 tabs in profile" (disabled with no other
+   profile directory). Right-click an unselected tab: it becomes the active
+   and only selected tab and the menu says "Close tab". Open a second window
+   with Cmd+N, select two tabs in the first, and drag one of them onto the
+   second window: both appear at the end of its strip (reloaded, with the
+   previously active one active) and leave the first. Drag a tab onto the
+   desktop: it opens in a new window. Dropping within the same window does
+   nothing. "Open tab in profile" starts a second Paladin for that profile
+   with the tab's URL and closes the tab here.
 5. **Crashed tab.** Each tab's script thread (DOM, JavaScript, layout)
    runs in a content process, a second `paladin` process. A page whose
    script thread panics or crashes natively (a Servo bug, not something a

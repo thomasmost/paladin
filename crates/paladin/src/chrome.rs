@@ -5,9 +5,13 @@ use std::collections::HashMap;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
 
-use egui::{Button, ColorImage, Id, Key, Panel, Rect, TextureHandle, TextureOptions, Ui, Vec2};
+use egui::{
+    Button, ColorImage, Id, Key, Panel, Pos2, Rect, Sense, TextureHandle, TextureOptions, Ui, Vec2,
+};
 use keyboard_types::Code;
-use paladin_core::{Command, CommandKind, Favicon, KeyChord, Keymap, LoadState, TabId, Window};
+use paladin_core::{
+    Command, CommandKind, Favicon, KeyChord, Keymap, LoadState, Profile, TabId, Window, WindowId,
+};
 use url::{ParseError, Url};
 
 const TAB_TITLE_MAX_CHARS: usize = 24;
@@ -26,6 +30,28 @@ pub struct ChromeState {
     shown_tab: Option<TabId>,
     shown_url: Option<Url>,
     favicons: HashMap<TabId, CachedFavicon>,
+    /// The other profiles on this machine, read from disk when a tab's
+    /// context menu opens (not every frame).
+    profiles: Option<Vec<String>>,
+    /// Set when a drag of tabs ends; the window takes it and works out
+    /// where the tabs were dropped.
+    tab_drop: Option<TabDrop>,
+}
+
+impl ChromeState {
+    /// The tab drag that ended since the last call, if any.
+    pub fn take_tab_drop(&mut self) -> Option<TabDrop> {
+        self.tab_drop.take()
+    }
+}
+
+/// A drag of tabs that ended: the tabs to move and where the pointer was
+/// when the button was released, in egui points of this window (which may
+/// be outside the window while the drag held the pointer).
+#[derive(Clone, Debug, PartialEq)]
+pub struct TabDrop {
+    pub tabs: Vec<TabId>,
+    pub pointer: Pos2,
 }
 
 /// An uploaded favicon texture. The `Arc` is a clone of the model's pixels:
@@ -39,11 +65,15 @@ struct CachedFavicon {
 }
 
 /// Draw the chrome for `window` and return the commands it produced.
-/// `engine_error` is the browser-wide engine error to show in the status
-/// area, if any.
+/// `others` are the other browser windows (id and a label) the tab context
+/// menu can move tabs to, `profile` the profile this process runs, and
+/// `engine_error` the browser-wide engine error to show in the status area,
+/// if any.
 pub fn draw(
     ui: &mut Ui,
     window: &Window,
+    others: &[(WindowId, String)],
+    profile: &Profile,
     engine_error: Option<&str>,
     state: &mut ChromeState,
     keymap: &Keymap,
@@ -60,25 +90,112 @@ pub fn draw(
             .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
+                    // How many tabs a drag in progress carries, for the overlay.
+                    let mut dragging: Option<usize> = None;
                     for tab in &window.tabs {
                         let is_active = tab.id == window.active;
+                        let is_selected = window.is_selected(tab.id);
                         if let Some(texture) =
                             favicon_texture(ui, state, tab.id, tab.favicon.as_ref())
                         {
                             ui.add(egui::Image::new((texture.id(), Vec2::splat(FAVICON_SIZE))));
                         }
                         let title = truncate(tab.display_title(), TAB_TITLE_MAX_CHARS);
-                        let response = ui.add(Button::selectable(is_active, title));
-                        if response.clicked() && !is_active {
-                            commands.push(Command::ActivateTab(tab.id));
+                        let mut button =
+                            Button::selectable(is_active, title).sense(Sense::click_and_drag());
+                        if is_selected && !is_active {
+                            // A paler version of the active tab's fill, with
+                            // its outline, so a selected tab reads as "part
+                            // of the group" next to the active one.
+                            let selection = ui.visuals().selection;
+                            let fill = selection.bg_fill;
+                            // `selectable(false, ..)` paints no frame while
+                            // idle, so ask for one or the fill never shows.
+                            button = button
+                                .frame_when_inactive(true)
+                                .fill(egui::Color32::from_rgba_unmultiplied(
+                                    fill.r(),
+                                    fill.g(),
+                                    fill.b(),
+                                    96,
+                                ))
+                                .stroke(selection.stroke);
+                        }
+                        let response = ui.add(button);
+                        // A plain click activates; Ctrl (Cmd on macOS) adds
+                        // or removes; Shift extends from the active tab.
+                        let modifiers = ui.input(|i| i.modifiers);
+                        if response.clicked() {
+                            if modifiers.shift {
+                                commands.push(Command::SelectTabRange(tab.id));
+                            } else if modifiers.command {
+                                commands.push(Command::ToggleTabSelection(tab.id));
+                            } else if !is_active || window.selected.len() > 1 {
+                                commands.push(Command::ActivateTab(tab.id));
+                            }
                         }
                         if response.middle_clicked() {
                             commands.push(Command::CloseTab(tab.id));
+                        }
+                        // The context menu and a drag act on the whole
+                        // selection when this tab is part of it; otherwise
+                        // on this tab alone, which becomes the active one.
+                        let targets = if is_selected {
+                            window.selection()
+                        } else {
+                            vec![tab.id]
+                        };
+                        if response.secondary_clicked() {
+                            if !is_selected {
+                                commands.push(Command::ActivateTab(tab.id));
+                            }
+                            state.profiles = Some(profile.others());
+                        }
+                        response.context_menu(|ui| {
+                            tab_menu(
+                                ui,
+                                window,
+                                &targets,
+                                others,
+                                state.profiles.as_deref().unwrap_or(&[]),
+                                &mut commands,
+                            );
+                        });
+                        if response.drag_started() && !is_selected {
+                            commands.push(Command::ActivateTab(tab.id));
+                        }
+                        if response.dragged() {
+                            dragging = Some(targets.len());
+                        }
+                        if response.drag_stopped()
+                            && let Some(pointer) = response.interact_pointer_pos()
+                        {
+                            state.tab_drop = Some(TabDrop {
+                                tabs: targets,
+                                pointer,
+                            });
                         }
                         if ui.small_button("×").on_hover_text("Close tab").clicked() {
                             commands.push(Command::CloseTab(tab.id));
                         }
                         ui.add_space(4.0);
+                    }
+                    if let (Some(count), Some(pointer)) = (dragging, ui.ctx().pointer_latest_pos())
+                    {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+                        egui::Area::new(Id::new("tab-drag-overlay"))
+                            .order(egui::Order::Tooltip)
+                            .fixed_pos(pointer + Vec2::new(12.0, 12.0))
+                            .interactable(false)
+                            .show(ui.ctx(), |ui| {
+                                egui::Frame::popup(ui.style()).show(ui, |ui| {
+                                    ui.label(if count == 1 {
+                                        "Move 1 tab".to_string()
+                                    } else {
+                                        format!("Move {count} tabs")
+                                    });
+                                });
+                            });
                     }
                     if ui
                         .button("+")
@@ -215,6 +332,96 @@ pub fn draw(
 
 /// The colour the framebuffer is cleared to before egui paints: the panel
 /// fill, in the gamma-space components egui_glow's painter expects.
+/// The context menu of a tab, acting on `targets` (the selection, or the
+/// right-clicked tab alone). Moves recreate the tabs at their URLs: a Servo
+/// webview cannot leave its window (`docs/upstream-issues.md`, S8).
+fn tab_menu(
+    ui: &mut Ui,
+    window: &Window,
+    targets: &[TabId],
+    others: &[(WindowId, String)],
+    profiles: &[String],
+    commands: &mut Vec<Command>,
+) {
+    let count = targets.len();
+    let plural = |one: &str, many: &str| {
+        if count == 1 {
+            one.to_string()
+        } else {
+            many.replace("{n}", &count.to_string())
+        }
+    };
+    let rest: Vec<TabId> = window
+        .tabs
+        .iter()
+        .map(|t| t.id)
+        .filter(|t| !targets.contains(t))
+        .collect();
+
+    if ui.button(plural("Close tab", "Close {n} tabs")).clicked() {
+        commands.push(Command::CloseTabs(targets.to_vec()));
+        ui.close();
+    }
+    if ui
+        .add_enabled(!rest.is_empty(), Button::new("Close other tabs"))
+        .clicked()
+    {
+        commands.push(Command::CloseTabs(rest.clone()));
+        ui.close();
+    }
+    ui.separator();
+    if ui
+        .add_enabled(
+            !rest.is_empty(),
+            Button::new(plural(
+                "Move tab to new window",
+                "Move {n} tabs to new window",
+            )),
+        )
+        .on_disabled_hover_text("This window has no other tabs")
+        .clicked()
+    {
+        commands.push(Command::MoveTabsToNewWindow(targets.to_vec()));
+        ui.close();
+    }
+    ui.add_enabled_ui(!others.is_empty(), |ui| {
+        ui.menu_button(
+            plural("Move tab to window", "Move {n} tabs to window"),
+            |ui| {
+                for (id, label) in others {
+                    if ui.button(truncate(label, TAB_TITLE_MAX_CHARS)).clicked() {
+                        commands.push(Command::MoveTabsToWindow {
+                            tabs: targets.to_vec(),
+                            window: *id,
+                        });
+                        ui.close();
+                    }
+                }
+            },
+        )
+        .response
+        .on_disabled_hover_text("There is no other window");
+    });
+    ui.add_enabled_ui(!profiles.is_empty(), |ui| {
+        ui.menu_button(
+            plural("Open tab in profile", "Open {n} tabs in profile"),
+            |ui| {
+                for name in profiles {
+                    if ui.button(name).clicked() {
+                        commands.push(Command::OpenTabsInProfile {
+                            tabs: targets.to_vec(),
+                            profile: name.clone(),
+                        });
+                        ui.close();
+                    }
+                }
+            },
+        )
+        .response
+        .on_disabled_hover_text("There is no other profile");
+    });
+}
+
 pub fn background(ctx: &egui::Context) -> [f32; 4] {
     ctx.global_style()
         .visuals

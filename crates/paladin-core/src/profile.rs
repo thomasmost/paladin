@@ -91,6 +91,28 @@ impl Profile {
     pub fn ensure_dirs(&self) -> io::Result<()> {
         std::fs::create_dir_all(self.servo_dir())
     }
+
+    /// The names of the other profiles on this machine: every validly
+    /// named directory under the profiles directory except this one,
+    /// sorted. Each is a profile another `paladin --profile <name>` process
+    /// can run. Returns nothing if the directory cannot be read.
+    pub fn others(&self) -> Vec<String> {
+        let Some(profiles_dir) = self.dir.parent() else {
+            return Vec::new();
+        };
+        let mut names: Vec<String> = std::fs::read_dir(profiles_dir)
+            .map(|entries| {
+                entries
+                    .filter_map(|entry| entry.ok())
+                    .filter(|entry| entry.file_type().is_ok_and(|t| t.is_dir()))
+                    .filter_map(|entry| entry.file_name().into_string().ok())
+                    .filter(|name| is_valid_name(name) && *name != self.name)
+                    .collect()
+            })
+            .unwrap_or_default();
+        names.sort();
+        names
+    }
 }
 
 fn is_valid_name(name: &str) -> bool {
@@ -193,5 +215,28 @@ mod tests {
         let p = Profile::resolve_under(root.path(), "t").unwrap();
         p.ensure_dirs().unwrap();
         assert!(p.servo_dir().is_dir());
+    }
+}
+
+#[cfg(test)]
+mod other_profiles_tests {
+    use super::*;
+
+    #[test]
+    fn others_lists_sibling_profile_directories_sorted_without_self() {
+        let root = tempfile::tempdir().expect("temp dir");
+        let me = Profile::resolve_under(root.path(), "work").unwrap();
+        for name in ["work", "zeta", "alpha", "bad name"] {
+            std::fs::create_dir_all(root.path().join("Paladin/profiles").join(name)).unwrap();
+        }
+        std::fs::write(root.path().join("Paladin/profiles/notes.txt"), "x").unwrap();
+        assert_eq!(me.others(), vec!["alpha".to_string(), "zeta".to_string()]);
+    }
+
+    #[test]
+    fn others_is_empty_when_the_profiles_directory_does_not_exist() {
+        let root = tempfile::tempdir().expect("temp dir");
+        let me = Profile::resolve_under(root.path(), "solo").unwrap();
+        assert!(me.others().is_empty());
     }
 }

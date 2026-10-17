@@ -15,7 +15,33 @@ pub enum Command {
         url: Option<Url>,
     },
     CloseTab(TabId),
+    /// Make `tab` active and the only selected tab (a plain click).
     ActivateTab(TabId),
+    /// Add `tab` to its window's selection or remove it (Ctrl-click). The
+    /// active tab is always selected, so toggling it does nothing.
+    ToggleTabSelection(TabId),
+    /// Select every tab between the active tab and `tab`, inclusive, and
+    /// nothing else (Shift-click). The active tab stays active.
+    SelectTabRange(TabId),
+    /// Close each of these tabs (the context menu's "Close tabs").
+    CloseTabs(Vec<TabId>),
+    /// Move these tabs to a new window, in strip order. A Servo webview
+    /// cannot leave its window (`docs/upstream-issues.md`, S8), so each
+    /// tab is recreated at its URL in the new window and closed here: the
+    /// page reloads and its history and form state are lost.
+    MoveTabsToNewWindow(Vec<TabId>),
+    /// Move these tabs to the end of `window`'s strip, the same way.
+    MoveTabsToWindow {
+        tabs: Vec<TabId>,
+        window: WindowId,
+    },
+    /// Open these tabs' URLs in a `paladin` process for `profile` (another
+    /// profile is another process: `docs/upstream-issues.md`, S7) and close
+    /// them here.
+    OpenTabsInProfile {
+        tabs: Vec<TabId>,
+        profile: String,
+    },
     NextTab(WindowId),
     PreviousTab(WindowId),
     Navigate {
@@ -75,6 +101,11 @@ pub enum EngineAction {
     CloseWindow(WindowId),
     FocusAddressBar(WindowId),
     OpenSettings,
+    /// Start a `paladin --profile <profile> <urls>` process.
+    OpenInProfile {
+        profile: String,
+        urls: Vec<Url>,
+    },
     Quit,
 }
 
@@ -84,6 +115,20 @@ pub fn dispatch(browser: &mut Browser, cmd: &Command) -> Vec<EngineAction> {
         Command::NewTab { window, url } => new_tab(browser, *window, url.clone()),
         Command::CloseTab(tab) => close_tab(browser, *tab),
         Command::ActivateTab(tab) => activate_tab(browser, *tab),
+        Command::ToggleTabSelection(tab) => {
+            toggle_tab_selection(browser, *tab);
+            Vec::new()
+        }
+        Command::SelectTabRange(tab) => {
+            select_tab_range(browser, *tab);
+            Vec::new()
+        }
+        Command::CloseTabs(tabs) => close_tabs(browser, tabs),
+        Command::MoveTabsToNewWindow(tabs) => move_tabs_to_new_window(browser, tabs),
+        Command::MoveTabsToWindow { tabs, window } => move_tabs_to_window(browser, tabs, *window),
+        Command::OpenTabsInProfile { tabs, profile } => {
+            open_tabs_in_profile(browser, tabs, profile)
+        }
         Command::NextTab(window) => step_tab(browser, *window, 1),
         Command::PreviousTab(window) => step_tab(browser, *window, -1),
         Command::Navigate { tab, url } => match browser.tab_mut(*tab) {
@@ -136,11 +181,9 @@ pub fn dispatch(browser: &mut Browser, cmd: &Command) -> Vec<EngineAction> {
 pub fn open_window(browser: &mut Browser, url: Url) -> Vec<EngineAction> {
     let window = browser.allocate_window_id();
     let tab = browser.allocate_tab_id();
-    browser.windows.push(Window {
-        id: window,
-        tabs: vec![Tab::new(tab, url.clone())],
-        active: tab,
-    });
+    browser
+        .windows
+        .push(Window::with_tab(window, Tab::new(tab, url.clone())));
     vec![EngineAction::OpenWindow { window, tab, url }]
 }
 
@@ -177,6 +220,7 @@ fn new_tab(browser: &mut Browser, window: WindowId, url: Option<Url>) -> Vec<Eng
     let previous = w.active;
     w.tabs.push(Tab::new(tab, url.clone()));
     w.active = tab;
+    w.select_only(tab);
     let mut actions = vec![
         EngineAction::Hide(previous),
         EngineAction::CreateTab { window, tab, url },
@@ -204,11 +248,13 @@ pub(crate) fn close_tab(browser: &mut Browser, tab: TabId) -> Vec<EngineAction> 
             .expect("window_of_tab returned an existing window");
         let index = w.index_of(tab).expect("tab is in this window");
         w.tabs.remove(index);
+        w.selected.retain(|t| *t != tab);
         if w.tabs.is_empty() {
             None
         } else if w.active == tab {
             let next = index.min(w.tabs.len() - 1);
             w.active = w.tabs[next].id;
+            w.select_only(w.active);
             Some(w.active)
         } else {
             return actions;
@@ -235,11 +281,151 @@ fn activate_tab(browser: &mut Browser, tab: TabId) -> Vec<EngineAction> {
         .window_mut(window_id)
         .expect("window_of_tab returned an existing window");
     if w.active == tab {
+        w.select_only(tab);
         return Vec::new();
     }
     let previous = w.active;
     w.active = tab;
+    w.select_only(tab);
     vec![EngineAction::Hide(previous), EngineAction::Show(tab)]
+}
+
+fn toggle_tab_selection(browser: &mut Browser, tab: TabId) {
+    let Some(window_id) = browser.window_of_tab(tab) else {
+        return;
+    };
+    let w = browser
+        .window_mut(window_id)
+        .expect("window_of_tab returned an existing window");
+    if w.active == tab {
+        return;
+    }
+    if w.is_selected(tab) {
+        w.selected.retain(|t| *t != tab);
+    } else {
+        w.selected.push(tab);
+    }
+}
+
+fn select_tab_range(browser: &mut Browser, tab: TabId) {
+    let Some(window_id) = browser.window_of_tab(tab) else {
+        return;
+    };
+    let w = browser
+        .window_mut(window_id)
+        .expect("window_of_tab returned an existing window");
+    let (from, to) = {
+        let a = w.active_index();
+        let b = w.index_of(tab).expect("tab is in this window");
+        (a.min(b), a.max(b))
+    };
+    w.selected = w.tabs[from..=to].iter().map(|t| t.id).collect();
+}
+
+fn close_tabs(browser: &mut Browser, tabs: &[TabId]) -> Vec<EngineAction> {
+    let mut actions = Vec::new();
+    for tab in tabs {
+        actions.extend(close_tab(browser, *tab));
+    }
+    actions
+}
+
+/// The tabs of `tabs` that exist, in strip order (window by window), with
+/// their URLs, and whether each is the active tab of its window.
+fn moving_tabs(browser: &Browser, tabs: &[TabId]) -> Vec<(TabId, Url, bool)> {
+    browser
+        .windows
+        .iter()
+        .flat_map(|w| {
+            w.tabs
+                .iter()
+                .filter(|t| tabs.contains(&t.id))
+                .map(move |t| (t.id, t.url.clone(), w.active == t.id))
+        })
+        .collect()
+}
+
+fn move_tabs_to_new_window(browser: &mut Browser, tabs: &[TabId]) -> Vec<EngineAction> {
+    let moving = moving_tabs(browser, tabs);
+    let Some((_, first_url, _)) = moving.first() else {
+        return Vec::new();
+    };
+    let mut actions = open_window(browser, first_url.clone());
+    let window = browser
+        .windows
+        .last()
+        .expect("open_window pushed a window")
+        .id;
+    actions.extend(place_moved_tabs(browser, window, &moving, 1));
+    actions
+}
+
+fn move_tabs_to_window(
+    browser: &mut Browser,
+    tabs: &[TabId],
+    window: WindowId,
+) -> Vec<EngineAction> {
+    if browser.window(window).is_none() {
+        return Vec::new();
+    }
+    let moving: Vec<_> = moving_tabs(browser, tabs)
+        .into_iter()
+        .filter(|(tab, _, _)| browser.window_of_tab(*tab) != Some(window))
+        .collect();
+    if moving.is_empty() {
+        return Vec::new();
+    }
+    place_moved_tabs(browser, window, &moving, 0)
+}
+
+/// Recreate `moving` (from index `already` on; the earlier ones are
+/// already in `window`, at its end) as new tabs at the end of `window`,
+/// activate the one standing in for the tab that was active in its old
+/// window (or the first), then close the originals.
+fn place_moved_tabs(
+    browser: &mut Browser,
+    window: WindowId,
+    moving: &[(TabId, Url, bool)],
+    already: usize,
+) -> Vec<EngineAction> {
+    let mut actions = Vec::new();
+    let first_new = browser
+        .window(window)
+        .map(|w| w.tabs.len() - already)
+        .unwrap_or(0);
+    for (_, url, _) in &moving[already..] {
+        actions.extend(new_tab(browser, window, Some(url.clone())));
+    }
+    let to_activate = {
+        let w = browser.window(window).expect("window existence checked");
+        let offset = moving
+            .iter()
+            .position(|(_, _, active)| *active)
+            .unwrap_or(0);
+        w.tabs[first_new + offset].id
+    };
+    actions.extend(activate_tab(browser, to_activate));
+    let old: Vec<TabId> = moving.iter().map(|(tab, _, _)| *tab).collect();
+    actions.extend(close_tabs(browser, &old));
+    actions
+}
+
+fn open_tabs_in_profile(browser: &mut Browser, tabs: &[TabId], profile: &str) -> Vec<EngineAction> {
+    if profile == browser.profile.name {
+        return Vec::new();
+    }
+    let moving = moving_tabs(browser, tabs);
+    if moving.is_empty() {
+        return Vec::new();
+    }
+    let urls = moving.iter().map(|(_, url, _)| url.clone()).collect();
+    let old: Vec<TabId> = moving.iter().map(|(tab, _, _)| *tab).collect();
+    let mut actions = vec![EngineAction::OpenInProfile {
+        profile: profile.to_string(),
+        urls,
+    }];
+    actions.extend(close_tabs(browser, &old));
+    actions
 }
 
 fn step_tab(browser: &mut Browser, window: WindowId, delta: isize) -> Vec<EngineAction> {
@@ -608,5 +794,229 @@ mod tests {
         b.engine_error = Some("lost backend".to_string());
         assert!(dispatch(&mut b, &Command::DismissEngineError).is_empty());
         assert_eq!(b.engine_error, None);
+    }
+
+    /// A window with three tabs; returns the browser, the window, and the
+    /// tab ids in strip order. The third tab is active.
+    fn three_tabs() -> (Browser, WindowId, [TabId; 3]) {
+        let (mut b, window, first) = one_window();
+        dispatch(
+            &mut b,
+            &Command::NewTab {
+                window,
+                url: Some(url("https://b.example/")),
+            },
+        );
+        dispatch(
+            &mut b,
+            &Command::NewTab {
+                window,
+                url: Some(url("https://c.example/")),
+            },
+        );
+        let w = b.window(window).unwrap();
+        let ids = [first, w.tabs[1].id, w.tabs[2].id];
+        assert_eq!(w.active, ids[2]);
+        (b, window, ids)
+    }
+
+    #[test]
+    fn a_new_or_activated_tab_is_the_only_selected_tab() {
+        let (mut b, window, [a, bb, c]) = three_tabs();
+        assert_eq!(b.window(window).unwrap().selection(), vec![c]);
+        dispatch(&mut b, &Command::ToggleTabSelection(a));
+        assert_eq!(b.window(window).unwrap().selection(), vec![a, c]);
+        dispatch(&mut b, &Command::ActivateTab(bb));
+        assert_eq!(b.window(window).unwrap().selection(), vec![bb]);
+    }
+
+    #[test]
+    fn toggling_adds_and_removes_tabs_but_never_the_active_one() {
+        let (mut b, window, [a, bb, c]) = three_tabs();
+        assert!(dispatch(&mut b, &Command::ToggleTabSelection(a)).is_empty());
+        dispatch(&mut b, &Command::ToggleTabSelection(bb));
+        assert_eq!(b.window(window).unwrap().selection(), vec![a, bb, c]);
+        dispatch(&mut b, &Command::ToggleTabSelection(a));
+        assert_eq!(b.window(window).unwrap().selection(), vec![bb, c]);
+        dispatch(&mut b, &Command::ToggleTabSelection(c));
+        assert_eq!(b.window(window).unwrap().selection(), vec![bb, c]);
+        assert_eq!(b.window(window).unwrap().active, c);
+        assert!(dispatch(&mut b, &Command::ToggleTabSelection(TabId(99))).is_empty());
+    }
+
+    #[test]
+    fn range_selection_runs_from_the_active_tab_in_either_direction() {
+        let (mut b, window, [a, bb, c]) = three_tabs();
+        dispatch(&mut b, &Command::SelectTabRange(a));
+        assert_eq!(b.window(window).unwrap().selection(), vec![a, bb, c]);
+        assert_eq!(b.window(window).unwrap().active, c);
+        dispatch(&mut b, &Command::ActivateTab(a));
+        dispatch(&mut b, &Command::SelectTabRange(bb));
+        assert_eq!(b.window(window).unwrap().selection(), vec![a, bb]);
+        dispatch(&mut b, &Command::SelectTabRange(a));
+        assert_eq!(b.window(window).unwrap().selection(), vec![a]);
+    }
+
+    #[test]
+    fn closing_a_tab_drops_it_from_the_selection() {
+        let (mut b, window, [a, bb, c]) = three_tabs();
+        dispatch(&mut b, &Command::SelectTabRange(a));
+        dispatch(&mut b, &Command::CloseTab(bb));
+        assert_eq!(b.window(window).unwrap().selection(), vec![a, c]);
+        // Closing the active tab makes the neighbour active and the only
+        // selected tab.
+        dispatch(&mut b, &Command::CloseTab(c));
+        assert_eq!(b.window(window).unwrap().selection(), vec![a]);
+    }
+
+    #[test]
+    fn close_tabs_closes_each_and_the_window_when_none_remain() {
+        let (mut b, window, [a, bb, c]) = three_tabs();
+        let actions = dispatch(&mut b, &Command::CloseTabs(vec![a, c]));
+        assert_eq!(b.window(window).unwrap().tabs.len(), 1);
+        assert_eq!(b.window(window).unwrap().active, bb);
+        assert!(actions.contains(&EngineAction::CloseTab(a)));
+        assert!(actions.contains(&EngineAction::CloseTab(c)));
+        let actions = dispatch(&mut b, &Command::CloseTabs(vec![bb, TabId(99)]));
+        assert!(b.windows.is_empty());
+        assert_eq!(
+            actions,
+            vec![
+                EngineAction::CloseTab(bb),
+                EngineAction::CloseWindow(window),
+                EngineAction::Quit,
+            ]
+        );
+    }
+
+    #[test]
+    fn moving_tabs_to_a_new_window_recreates_them_there_and_closes_the_originals() {
+        let (mut b, window, [a, bb, c]) = three_tabs();
+        let actions = dispatch(&mut b, &Command::MoveTabsToNewWindow(vec![c, a]));
+        assert_eq!(b.windows.len(), 2);
+        let new = &b.windows[1];
+        let urls: Vec<&str> = new.tabs.iter().map(|t| t.url.as_str()).collect();
+        // Strip order, not the order given.
+        assert_eq!(urls, vec!["https://a.example/", "https://c.example/"]);
+        // The tab that was active moves as the active tab.
+        assert_eq!(new.active_tab().url.as_str(), "https://c.example/");
+        assert_eq!(new.selection(), vec![new.active]);
+        let old = b.window(window).unwrap();
+        assert_eq!(old.tabs.iter().map(|t| t.id).collect::<Vec<_>>(), vec![bb]);
+        assert_eq!(old.active, bb);
+        // The new window opens before the old tabs close, so an old window
+        // that empties out never looks like the last one.
+        let open = actions
+            .iter()
+            .position(|x| matches!(x, EngineAction::OpenWindow { .. }))
+            .unwrap();
+        let close = actions
+            .iter()
+            .position(|x| *x == EngineAction::CloseTab(a))
+            .unwrap();
+        assert!(open < close);
+        assert!(!actions.contains(&EngineAction::Quit));
+    }
+
+    #[test]
+    fn moving_every_tab_to_a_new_window_closes_the_old_window_without_quitting() {
+        let (mut b, window, [a, bb, c]) = three_tabs();
+        let actions = dispatch(&mut b, &Command::MoveTabsToNewWindow(vec![a, bb, c]));
+        assert_eq!(b.windows.len(), 1);
+        assert_ne!(b.windows[0].id, window);
+        assert!(actions.contains(&EngineAction::CloseWindow(window)));
+        assert!(!actions.contains(&EngineAction::Quit));
+    }
+
+    #[test]
+    fn moving_tabs_to_another_window_appends_them_and_activates_the_moved_active_tab() {
+        let (mut b, window, [a, _bb, c]) = three_tabs();
+        let other_actions = dispatch(&mut b, &Command::NewWindow);
+        let EngineAction::OpenWindow { window: other, .. } = other_actions[0].clone() else {
+            panic!("NewWindow opens a window");
+        };
+        let actions = dispatch(
+            &mut b,
+            &Command::MoveTabsToWindow {
+                tabs: vec![a, c],
+                window: other,
+            },
+        );
+        let target = b.window(other).unwrap();
+        let urls: Vec<&str> = target.tabs.iter().map(|t| t.url.as_str()).collect();
+        assert_eq!(urls.len(), 3);
+        assert_eq!(&urls[1..], &["https://a.example/", "https://c.example/"]);
+        assert_eq!(target.active_tab().url.as_str(), "https://c.example/");
+        assert_eq!(b.window(window).unwrap().tabs.len(), 1);
+        assert!(actions.contains(&EngineAction::CloseTab(a)));
+        assert!(actions.contains(&EngineAction::CloseTab(c)));
+        // Tabs already in the target, unknown tabs, and unknown windows are ignored.
+        let before = b.windows.clone();
+        let moved = target.tabs[1].id;
+        assert!(
+            dispatch(
+                &mut b,
+                &Command::MoveTabsToWindow {
+                    tabs: vec![moved, TabId(99)],
+                    window: other,
+                },
+            )
+            .is_empty()
+        );
+        assert!(
+            dispatch(
+                &mut b,
+                &Command::MoveTabsToWindow {
+                    tabs: vec![a],
+                    window: WindowId(99),
+                },
+            )
+            .is_empty()
+        );
+        assert_eq!(b.windows, before);
+    }
+
+    #[test]
+    fn opening_tabs_in_another_profile_hands_over_the_urls_and_closes_them() {
+        let (mut b, window, [a, bb, c]) = three_tabs();
+        let actions = dispatch(
+            &mut b,
+            &Command::OpenTabsInProfile {
+                tabs: vec![c, a],
+                profile: "work".to_string(),
+            },
+        );
+        assert_eq!(
+            actions[0],
+            EngineAction::OpenInProfile {
+                profile: "work".to_string(),
+                urls: vec![url("https://a.example/"), url("https://c.example/")],
+            }
+        );
+        assert!(actions.contains(&EngineAction::CloseTab(a)));
+        assert!(actions.contains(&EngineAction::CloseTab(c)));
+        assert_eq!(
+            b.window(window)
+                .unwrap()
+                .tabs
+                .iter()
+                .map(|t| t.id)
+                .collect::<Vec<_>>(),
+            vec![bb]
+        );
+        // The current profile is not another process: nothing happens.
+        let before = b.windows.clone();
+        let own_profile = b.profile.name.clone();
+        assert!(
+            dispatch(
+                &mut b,
+                &Command::OpenTabsInProfile {
+                    tabs: vec![bb],
+                    profile: own_profile,
+                },
+            )
+            .is_empty()
+        );
+        assert_eq!(b.windows, before);
     }
 }

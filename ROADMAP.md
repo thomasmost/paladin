@@ -19,7 +19,8 @@ Named profiles with one Paladin process per profile (Servo's cookies and
 storage are per process), a `profiles.toml` registry, a launcher, and
 color-coded chrome. Moving tabs between windows or profiles, implemented as a
 close plus a create with the same URL, because a Servo `WebView` cannot leave
-the window it was created in.
+the window it was created in (shipped 2026-10-17 with tab selection and the
+tab context menu: `docs/design-plans/2026-10-17-tab-selection-and-moves.md`).
 
 ## Phase 3 — Extensions
 

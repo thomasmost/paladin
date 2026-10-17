@@ -8,6 +8,18 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Added
 
+- Tab selection and tab moves. Ctrl-click (Cmd-click on macOS) adds a tab
+  to the selection or removes it, Shift-click selects the range from the
+  active tab; selected tabs are tinted. Right-click a tab for a menu that
+  acts on the selection (or on that tab): Close tab(s), Close other tabs,
+  Move to new window, Move to window (the other open windows), Open in
+  profile (the other profiles on this machine, each started as its own
+  `paladin` process). Drag selected tabs onto another Paladin window to
+  move them there, or onto the desktop to open a new window with them. A
+  moved tab is recreated at its URL in the destination (a Servo webview
+  cannot leave its window, `docs/upstream-issues.md` S8), so the page
+  reloads and loses its history and form state. Design:
+  `docs/design-plans/2026-10-17-tab-selection-and-moves.md`.
 - Each tab's script thread (DOM, JavaScript, layout) runs in its own
   content process, Servo's multiprocess mode: the browser starts a second
   `paladin` process per script thread (with a hidden `--content-process`
