@@ -112,7 +112,9 @@ or engine glue. Each item must pass.
    previously active one active) and leave the first. Drag a tab onto the
    desktop: it opens in a new window. Dropping within the same window does
    nothing. "Open tab in profile" starts a second Paladin for that profile
-   with the tab's URL and closes the tab here.
+   with the tab's URL and closes the tab here. Both this menu and the "☰"
+   menu are the system's own popup menus (native look, Escape closes them,
+   shortcuts shown the platform way), not egui.
 5. **Crashed tab.** Each tab's script thread (DOM, JavaScript, layout)
    runs in a content process, a second `paladin` process. A page whose
    script thread panics or crashes natively (a Servo bug, not something a

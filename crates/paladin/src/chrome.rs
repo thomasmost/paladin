@@ -11,8 +11,7 @@ use egui::{
 };
 use keyboard_types::Code;
 use paladin_core::{
-    ChromeColor, Command, CommandKind, Favicon, KeyChord, Keymap, LoadState, Profile, TabId,
-    Window, WindowId,
+    ChromeColor, Command, CommandKind, Favicon, KeyChord, Keymap, LoadState, TabId, Window,
 };
 use url::{ParseError, Url};
 
@@ -97,12 +96,12 @@ pub struct ChromeState {
     shown_tab: Option<TabId>,
     shown_url: Option<Url>,
     favicons: HashMap<TabId, CachedFavicon>,
-    /// The other profiles on this machine, read from disk when a tab's
-    /// context menu opens (not every frame).
-    profiles: Option<Vec<String>>,
     /// Set when a drag of tabs ends; the window takes it and works out
     /// where the tabs were dropped.
     tab_drop: Option<TabDrop>,
+    /// Set when the user asks for a menu; the window shows it as a native
+    /// popup (`native_menu`) once the frame is painted.
+    menu_request: Option<MenuRequest>,
 }
 
 impl ChromeState {
@@ -110,6 +109,21 @@ impl ChromeState {
     pub fn take_tab_drop(&mut self) -> Option<TabDrop> {
         self.tab_drop.take()
     }
+
+    /// The menu the user asked for since the last call, if any.
+    pub fn take_menu_request(&mut self) -> Option<MenuRequest> {
+        self.menu_request.take()
+    }
+}
+
+/// A menu the chrome wants shown, with where to put it (egui points of
+/// this window).
+#[derive(Clone, Debug, PartialEq)]
+pub enum MenuRequest {
+    /// The "☰" window menu, below its button.
+    Window { position: Pos2 },
+    /// A tab's context menu, acting on `targets`, at the pointer.
+    Tab { targets: Vec<TabId>, position: Pos2 },
 }
 
 /// A drag of tabs that ended: the tabs to move and where the pointer was
@@ -134,11 +148,6 @@ struct CachedFavicon {
 /// What the chrome needs besides the window it draws.
 #[derive(Clone, Copy)]
 pub struct ChromeContext<'a> {
-    /// The other browser windows (id and a label) the tab context menu can
-    /// move tabs to.
-    pub others: &'a [(WindowId, String)],
-    /// The profile this process runs.
-    pub profile: &'a Profile,
     /// The profile's chrome colour.
     pub color: ChromeColor,
     /// The browser-wide engine error to show in the status area, if any.
@@ -154,8 +163,6 @@ pub fn draw(
     keymap: &Keymap,
 ) -> Vec<Command> {
     let ChromeContext {
-        others,
-        profile,
         color,
         engine_error,
     } = *context;
@@ -219,18 +226,13 @@ pub fn draw(
                             if !is_selected {
                                 commands.push(Command::ActivateTab(tab.id));
                             }
-                            state.profiles = Some(profile.others());
+                            state.menu_request = Some(MenuRequest::Tab {
+                                targets: targets.clone(),
+                                position: response
+                                    .interact_pointer_pos()
+                                    .unwrap_or_else(|| response.rect.left_bottom()),
+                            });
                         }
-                        response.context_menu(|ui| {
-                            tab_menu(
-                                ui,
-                                window,
-                                &targets,
-                                others,
-                                state.profiles.as_deref().unwrap_or(&[]),
-                                &mut commands,
-                            );
-                        });
                         if response.drag_started() && !is_selected {
                             commands.push(Command::ActivateTab(tab.id));
                         }
@@ -279,30 +281,12 @@ pub fn draw(
                             url: None,
                         });
                     }
-                    egui::containers::menu::MenuButton::from_button(on_strip("☰", 16.0)).ui(
-                        ui,
-                        |ui| {
-                            if ui
-                                .button(hint(keymap, CommandKind::NewWindow, "New window"))
-                                .clicked()
-                            {
-                                commands.push(Command::NewWindow);
-                                ui.close();
-                            }
-                            if ui
-                                .button(hint(keymap, CommandKind::OpenSettings, "Settings"))
-                                .clicked()
-                            {
-                                commands.push(Command::OpenSettings);
-                                ui.close();
-                            }
-                            ui.separator();
-                            if ui.button(hint(keymap, CommandKind::Quit, "Quit")).clicked() {
-                                commands.push(Command::Quit);
-                                ui.close();
-                            }
-                        },
-                    );
+                    let menu = ui.add(on_strip("☰", 16.0)).on_hover_text("Menu");
+                    if menu.clicked() {
+                        state.menu_request = Some(MenuRequest::Window {
+                            position: menu.rect.left_bottom(),
+                        });
+                    }
                 });
             });
     });
@@ -412,96 +396,6 @@ pub fn draw(
 
 /// The colour the framebuffer is cleared to before egui paints: the panel
 /// fill, in the gamma-space components egui_glow's painter expects.
-/// The context menu of a tab, acting on `targets` (the selection, or the
-/// right-clicked tab alone). Moves recreate the tabs at their URLs: a Servo
-/// webview cannot leave its window (`docs/upstream-issues.md`, S8).
-fn tab_menu(
-    ui: &mut Ui,
-    window: &Window,
-    targets: &[TabId],
-    others: &[(WindowId, String)],
-    profiles: &[String],
-    commands: &mut Vec<Command>,
-) {
-    let count = targets.len();
-    let plural = |one: &str, many: &str| {
-        if count == 1 {
-            one.to_string()
-        } else {
-            many.replace("{n}", &count.to_string())
-        }
-    };
-    let rest: Vec<TabId> = window
-        .tabs
-        .iter()
-        .map(|t| t.id)
-        .filter(|t| !targets.contains(t))
-        .collect();
-
-    if ui.button(plural("Close tab", "Close {n} tabs")).clicked() {
-        commands.push(Command::CloseTabs(targets.to_vec()));
-        ui.close();
-    }
-    if ui
-        .add_enabled(!rest.is_empty(), Button::new("Close other tabs"))
-        .clicked()
-    {
-        commands.push(Command::CloseTabs(rest.clone()));
-        ui.close();
-    }
-    ui.separator();
-    if ui
-        .add_enabled(
-            !rest.is_empty(),
-            Button::new(plural(
-                "Move tab to new window",
-                "Move {n} tabs to new window",
-            )),
-        )
-        .on_disabled_hover_text("This window has no other tabs")
-        .clicked()
-    {
-        commands.push(Command::MoveTabsToNewWindow(targets.to_vec()));
-        ui.close();
-    }
-    ui.add_enabled_ui(!others.is_empty(), |ui| {
-        ui.menu_button(
-            plural("Move tab to window", "Move {n} tabs to window"),
-            |ui| {
-                for (id, label) in others {
-                    if ui.button(truncate(label, TAB_TITLE_MAX_CHARS)).clicked() {
-                        commands.push(Command::MoveTabsToWindow {
-                            tabs: targets.to_vec(),
-                            window: *id,
-                        });
-                        ui.close();
-                    }
-                }
-            },
-        )
-        .response
-        .on_disabled_hover_text("There is no other window");
-    });
-    ui.add_enabled_ui(!profiles.is_empty(), |ui| {
-        ui.menu_button(
-            plural("Open tab in profile", "Open {n} tabs in profile"),
-            |ui| {
-                for name in profiles {
-                    if ui.button(name).clicked() {
-                        commands.push(Command::OpenTabsInProfile {
-                            tabs: targets.to_vec(),
-                            profile: name.clone(),
-                        });
-                        ui.close();
-                    }
-                }
-            },
-        )
-        .response
-        .on_disabled_hover_text("There is no other profile");
-    });
-}
-
 /// The colour the window is cleared to before the chrome paints: the
 /// toolbar fill for `color`, so nothing flashes a different shade.
 pub fn background(ctx: &egui::Context, color: ChromeColor) -> [f32; 4] {

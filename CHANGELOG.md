@@ -80,6 +80,11 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Changed
 
+- The "☰" window menu and the tab context menu are native popup menus
+  (`muda`) rather than egui menus, so they look and behave like the
+  system's, show shortcuts the platform way, and work with screen readers.
+  Their entries are built as data in `menus.rs` and still only issue
+  `Command`s; everything else in the chrome stays egui.
 - A new tab opened with "+" or the New tab shortcut puts the keyboard focus
   in the address bar with its text selected; tabs opened on a URL (popups)
   leave the focus on the page.

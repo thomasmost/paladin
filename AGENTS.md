@@ -4,7 +4,7 @@ A desktop web browser for macOS and Windows. Servo renders pages, egui draws
 the chrome, winit owns the windows. Everything that touches Servo lives in one
 crate so the engine could be replaced without rewriting the model or the UI.
 
-_Last updated: 2026-10-16 (release symbols)._
+_Last updated: 2026-10-18 (native menus)._
 
 ## Architecture
 
@@ -14,7 +14,7 @@ Cargo workspace (Rust 1.97.1 pinned in `rust-toolchain.toml`, edition 2024).
 | ----------------------- | ---------- |
 | `crates/paladin-core`   | `paladin-core` — the Servo-free model: `model` (`Browser`/`Window`/`Tab`), `command` (`Command`, `dispatch`, `EngineAction`), `event` (`EngineEvent`, `apply`), `keymap` (`Keymap`, `KeyChord`, `CommandKind`), `settings` (TOML), `profile` (paths). Depends on neither servo, egui, nor winit. |
 | `crates/paladin-engine` | `paladin-engine` — the only crate that imports `servo`. `engine.rs` (`Engine`, one per process), `host.rs` (`GlSurface`, a window's GL context; `TabHost`, the tabs of one window painted offscreen), `input.rs` (`EngineInput`), `delegate.rs` (Servo callbacks → `EngineEvent`). Re-exports `keyboard_types` and `PhysicalSize`. |
-| `crates/paladin`        | `paladin` — the binary: `app.rs` (winit `App`), `window.rs` (`BrowserWindow`, egui chrome over the tab host), `settings_window.rs`, `chrome.rs` (pure chrome drawing that returns `Command`s), `routing.rs` (pure, unit-tested pointer/key routing and page-area geometry), `input.rs` (winit → `EngineInput`, `route_key`), `keyutils.rs` (winit keys → `keyboard-types`, copied from servoshell, MPL-2.0 header must stay), `icon.rs`, and the cargo-packager metadata in its `Cargo.toml`. |
+| `crates/paladin`        | `paladin` — the binary: `app.rs` (winit `App`), `window.rs` (`BrowserWindow`, egui chrome over the tab host), `settings_window.rs`, `chrome.rs` (pure chrome drawing that returns `Command`s), `routing.rs` (pure, unit-tested pointer/key routing and page-area geometry), `menus.rs` (the window and tab menus as unit-tested `MenuEntry` data), `native_menu.rs` (shows a `MenuEntry` list as a native popup through `muda` and maps the click back to a `Command`), `input.rs` (winit → `EngineInput`, `route_key`), `keyutils.rs` (winit keys → `keyboard-types`, copied from servoshell, MPL-2.0 header must stay), `icon.rs`, and the cargo-packager metadata in its `Cargo.toml`. |
 | `xtask`                 | `cargo xtask icons` (renders `assets/logo.svg`, which frames the `logo.png` artwork, at 1024 px and area-averages the smaller icns/ico/png sizes from it) and `cargo xtask angle-dlls` (Windows ANGLE DLLs next to the binaries). |
 
 Data flow: the chrome and the keymap emit `Command`s; `paladin_core::dispatch`
@@ -148,6 +148,11 @@ Run from the repo root:
 - **Every user action is a `Command`.** New chrome controls and shortcuts add
   a `Command` (and a `CommandKind` if it needs a hotkey), never a direct
   engine call.
+- **Menus are native, the rest of the chrome is egui.** A menu is a
+  `Vec<MenuEntry>` from `menus.rs` (label, enabled, optional chord,
+  `Command`), shown by `native_menu::NativeMenu` after the frame is
+  painted (`BrowserWindow::show_menu`); the chrome only records a
+  `MenuRequest`. Add entries in `menus.rs` with a test, not in `chrome.rs`.
 - **Tabs run in content processes.** `Engine::new(.., multiprocess: true)`
   sets Servo's `multiprocess` option; Servo then starts the current
   executable with `--content-process <token>` for each script thread, and

@@ -9,7 +9,7 @@ use paladin_core::{Browser, Command, Keymap, TabId, WindowId};
 use paladin_engine::{
     BlitRect, Engine, EngineError, EngineInput, GlSurface, PhysicalSize, TabHost,
 };
-use winit::dpi::{LogicalSize, PhysicalPosition};
+use winit::dpi::{LogicalPosition, LogicalSize, PhysicalPosition};
 use winit::event::{ElementState, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::ModifiersState;
@@ -346,13 +346,6 @@ impl BrowserWindow {
         let active = model.active;
         let crashed = model.active_tab().crashed.clone();
         let engine_error = browser.engine_error.as_deref();
-        let others: Vec<(WindowId, String)> = browser
-            .windows
-            .iter()
-            .filter(|w| w.id != self.id)
-            .map(|w| (w.id, w.active_tab().display_title().to_string()))
-            .collect();
-        let profile = &browser.profile;
         let chrome_color = browser.settings.chrome_color;
         let mut commands = Vec::new();
         let mut content_top_px = 0.0;
@@ -366,8 +359,6 @@ impl BrowserWindow {
         } = self;
         egui.run(window, |ui| {
             let context = chrome::ChromeContext {
-                others: &others,
-                profile,
                 color: chrome_color,
                 engine_error,
             };
@@ -426,7 +417,51 @@ impl BrowserWindow {
         if self.egui.egui_ctx.has_requested_repaint() {
             self.window.request_redraw();
         }
+        // After the frame is on screen: a native menu blocks until it closes.
+        if let Some(request) = self.chrome.take_menu_request()
+            && let Some(command) = self.show_menu(browser, keymap, request)
+        {
+            commands.push(command);
+        }
         commands
+    }
+
+    /// Show a native popup for `request` and return the command of the item
+    /// the user picked, if any. The menu's entries come from `menus`; the
+    /// tab menu lists the other windows and the other profiles.
+    fn show_menu(
+        &self,
+        browser: &Browser,
+        keymap: &Keymap,
+        request: chrome::MenuRequest,
+    ) -> Option<Command> {
+        let model = browser.window(self.id)?;
+        let (entries, position) = match request {
+            chrome::MenuRequest::Window { position } => {
+                (crate::menus::window_menu(model, keymap), position)
+            }
+            chrome::MenuRequest::Tab { targets, position } => {
+                let others: Vec<(WindowId, String)> = browser
+                    .windows
+                    .iter()
+                    .filter(|w| w.id != self.id)
+                    .map(|w| (w.id, w.active_tab().display_title().to_string()))
+                    .collect();
+                let profiles = browser.profile.others();
+                (
+                    crate::menus::tab_menu(model, &targets, &others, &profiles),
+                    position,
+                )
+            }
+        };
+        let menu = crate::native_menu::NativeMenu::build(&entries);
+        menu.show(
+            &self.window,
+            Some(LogicalPosition::new(
+                f64::from(position.x),
+                f64::from(position.y),
+            )),
+        )
     }
 }
 

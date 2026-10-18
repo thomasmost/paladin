@@ -22,6 +22,7 @@ log = { workspace = true }
 png = "0.18"
 url = { workspace = true }
 winit = { workspace = true }
+muda = { version = "0.21", default-features = false }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"

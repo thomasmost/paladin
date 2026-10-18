@@ -10,6 +10,8 @@ mod fatal;
 mod icon;
 mod input;
 mod keyutils;
+mod menus;
+mod native_menu;
 mod process;
 mod routing;
 mod settings_window;
