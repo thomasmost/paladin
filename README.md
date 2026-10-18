@@ -5,6 +5,31 @@ through Servo, the experimental Rust browser engine; the window chrome (tab
 strip, address bar, settings) is drawn with egui. There is no HTML in the
 chrome.
 
+## Features
+
+- **Servo under the hood.** Pages render through Servo, the Rust browser
+  engine, not Chromium or WebKit. The chrome is drawn with egui; menus are
+  the system's own popup menus.
+- **Crashes stay in their tab.** Each tab's script thread runs in its own
+  content process. A page that takes Servo down shows an error panel in that
+  tab with the reason; every other tab keeps working.
+- **Multi-select tabs.** Cmd/Ctrl-click and Shift-click select several
+  tabs, then drag them together onto another window or onto the desktop
+  for a new one, or right-click to close them all, move them to a window,
+  or open them in another profile.
+- **Profiles.** Each profile has its own settings, cookies, and local
+  storage; `--profile <name>` picks one, and a tab can be handed to another
+  profile from its context menu.
+- **Your colour.** Settings offers a row of swatches that tint the tab strip
+  and toolbar per profile.
+- **Keyboard first.** Every control is a command with a platform-native
+  shortcut, and chords work even while the address bar has focus.
+- **Web Animations.** Script-driven CSS animations are sampled by Paladin's
+  forks of Servo and stylo, so pages such as bsky.app render past their
+  splash screens.
+- **Engine-agnostic design.** Only one crate imports Servo; the model and
+  the UI speak in pure, unit-tested commands and events.
+
 ## Stack
 
 | Layer     | Choice                                                            |
