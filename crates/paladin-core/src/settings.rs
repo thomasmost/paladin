@@ -16,6 +16,9 @@ pub struct Settings {
     pub new_tab_url: String,
     /// Reserved for session restore; stored but not acted on in Phase 1.
     pub restore_windows_on_launch: bool,
+    /// The colour of this profile's chrome (tab strip, toolbar tint), one of
+    /// a few swatches so windows of different profiles tell apart at a glance.
+    pub chrome_color: ChromeColor,
 }
 
 impl Default for Settings {
@@ -24,6 +27,60 @@ impl Default for Settings {
             homepage: "https://servo.org/".to_string(),
             new_tab_url: "about:blank".to_string(),
             restore_windows_on_launch: false,
+            chrome_color: ChromeColor::default(),
+        }
+    }
+}
+
+/// A chrome colour swatch. Stored by name (`chrome_color = "ocean"`); the
+/// UI derives every shade it needs from the swatch's base colour.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ChromeColor {
+    #[default]
+    Slate,
+    Ocean,
+    Forest,
+    Plum,
+    Rose,
+    Amber,
+    Graphite,
+}
+
+impl ChromeColor {
+    /// Every swatch, in the order the settings window shows them.
+    pub const ALL: [ChromeColor; 7] = [
+        ChromeColor::Slate,
+        ChromeColor::Ocean,
+        ChromeColor::Forest,
+        ChromeColor::Plum,
+        ChromeColor::Rose,
+        ChromeColor::Amber,
+        ChromeColor::Graphite,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            ChromeColor::Slate => "Slate",
+            ChromeColor::Ocean => "Ocean",
+            ChromeColor::Forest => "Forest",
+            ChromeColor::Plum => "Plum",
+            ChromeColor::Rose => "Rose",
+            ChromeColor::Amber => "Amber",
+            ChromeColor::Graphite => "Graphite",
+        }
+    }
+
+    /// The base colour, sRGB. All swatches are dark enough for white text.
+    pub fn rgb(self) -> [u8; 3] {
+        match self {
+            ChromeColor::Slate => [71, 85, 105],
+            ChromeColor::Ocean => [14, 110, 140],
+            ChromeColor::Forest => [31, 112, 72],
+            ChromeColor::Plum => [96, 60, 142],
+            ChromeColor::Rose => [168, 36, 86],
+            ChromeColor::Amber => [166, 86, 12],
+            ChromeColor::Graphite => [40, 41, 46],
         }
     }
 }
@@ -116,9 +173,23 @@ mod tests {
             homepage: "https://a.example/".to_string(),
             new_tab_url: "https://b.example/".to_string(),
             restore_windows_on_launch: true,
+            chrome_color: ChromeColor::Plum,
         };
         let text = s.to_toml().unwrap();
+        assert!(text.contains("chrome_color = \"plum\""), "{text}");
         assert_eq!(Settings::parse(&text).unwrap(), s);
+    }
+
+    #[test]
+    fn chrome_color_names_are_kebab_case_and_unknown_names_are_errors() {
+        let s = Settings::parse("chrome_color = \"graphite\"\n").unwrap();
+        assert_eq!(s.chrome_color, ChromeColor::Graphite);
+        assert!(matches!(
+            Settings::parse("chrome_color = \"neon\"\n"),
+            Err(SettingsError::Parse(_))
+        ));
+        assert_eq!(ChromeColor::ALL.len(), 7);
+        assert_eq!(ChromeColor::default(), ChromeColor::Slate);
     }
 
     #[test]

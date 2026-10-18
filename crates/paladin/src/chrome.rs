@@ -6,16 +6,83 @@ use std::net::Ipv4Addr;
 use std::sync::Arc;
 
 use egui::{
-    Button, ColorImage, Id, Key, Panel, Pos2, Rect, Sense, TextureHandle, TextureOptions, Ui, Vec2,
+    Align2, Button, Color32, ColorImage, CornerRadius, Frame, Id, Key, Margin, Panel, Pos2, Rect,
+    RichText, Sense, Stroke, StrokeKind, TextStyle, TextureHandle, TextureOptions, Ui, Vec2,
 };
 use keyboard_types::Code;
 use paladin_core::{
-    Command, CommandKind, Favicon, KeyChord, Keymap, LoadState, Profile, TabId, Window, WindowId,
+    ChromeColor, Command, CommandKind, Favicon, KeyChord, Keymap, LoadState, Profile, TabId,
+    Window, WindowId,
 };
 use url::{ParseError, Url};
 
 const TAB_TITLE_MAX_CHARS: usize = 24;
 const FAVICON_SIZE: f32 = 16.0;
+/// Tab geometry, in points.
+const TAB_HEIGHT: f32 = 32.0;
+const TAB_PADDING_X: f32 = 12.0;
+const TAB_CORNER: u8 = 8;
+const CLOSE_SIZE: f32 = 18.0;
+
+/// The shades the chrome paints with, all derived from the profile's
+/// [`ChromeColor`]: the tab strip is the swatch itself, tabs are veils of
+/// white (or black, on a light swatch) over it, and the active tab shares
+/// the toolbar's fill, which is the swatch washed most of the way to the
+/// page background, so it reads as attached to the page.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Palette {
+    pub strip: Color32,
+    pub toolbar: Color32,
+    pub text_on_strip: Color32,
+    pub tab_idle: Color32,
+    pub tab_hover: Color32,
+    pub tab_selected: Color32,
+    pub tab_outline: Color32,
+}
+
+impl Palette {
+    pub fn new(color: ChromeColor, dark_mode: bool) -> Palette {
+        let [r, g, b] = color.rgb();
+        let strip = Color32::from_rgb(r, g, b);
+        let page = if dark_mode {
+            Color32::from_gray(32)
+        } else {
+            Color32::WHITE
+        };
+        let light_strip = luminance(strip) > 0.55;
+        let veil = if light_strip {
+            Color32::BLACK
+        } else {
+            Color32::WHITE
+        };
+        let veil_alpha = |a: u8| Color32::from_rgba_unmultiplied(veil.r(), veil.g(), veil.b(), a);
+        Palette {
+            strip,
+            toolbar: blend(strip, page, 0.84),
+            text_on_strip: if light_strip {
+                Color32::from_gray(24)
+            } else {
+                Color32::WHITE
+            },
+            tab_idle: veil_alpha(26),
+            tab_hover: veil_alpha(56),
+            tab_selected: veil_alpha(96),
+            tab_outline: veil_alpha(180),
+        }
+    }
+}
+
+/// `a` moved `t` of the way to `b`, per channel.
+fn blend(a: Color32, b: Color32, t: f32) -> Color32 {
+    let mix = |x: u8, y: u8| (f32::from(x) + (f32::from(y) - f32::from(x)) * t).round() as u8;
+    Color32::from_rgb(mix(a.r(), b.r()), mix(a.g(), b.g()), mix(a.b(), b.b()))
+}
+
+/// Relative luminance in 0..1, from gamma-space channels (close enough to
+/// pick a text colour).
+fn luminance(c: Color32) -> f32 {
+    (0.2126 * f32::from(c.r()) + 0.7152 * f32::from(c.g()) + 0.0722 * f32::from(c.b())) / 255.0
+}
 
 /// Per-window chrome state that is not part of the browser model: the
 /// address bar text the user may be editing, and favicon textures.
@@ -64,64 +131,67 @@ struct CachedFavicon {
     texture: TextureHandle,
 }
 
+/// What the chrome needs besides the window it draws.
+#[derive(Clone, Copy)]
+pub struct ChromeContext<'a> {
+    /// The other browser windows (id and a label) the tab context menu can
+    /// move tabs to.
+    pub others: &'a [(WindowId, String)],
+    /// The profile this process runs.
+    pub profile: &'a Profile,
+    /// The profile's chrome colour.
+    pub color: ChromeColor,
+    /// The browser-wide engine error to show in the status area, if any.
+    pub engine_error: Option<&'a str>,
+}
+
 /// Draw the chrome for `window` and return the commands it produced.
-/// `others` are the other browser windows (id and a label) the tab context
-/// menu can move tabs to, `profile` the profile this process runs, and
-/// `engine_error` the browser-wide engine error to show in the status area,
-/// if any.
 pub fn draw(
     ui: &mut Ui,
     window: &Window,
-    others: &[(WindowId, String)],
-    profile: &Profile,
-    engine_error: Option<&str>,
+    context: &ChromeContext<'_>,
     state: &mut ChromeState,
     keymap: &Keymap,
 ) -> Vec<Command> {
+    let ChromeContext {
+        others,
+        profile,
+        color,
+        engine_error,
+    } = *context;
     let mut commands = Vec::new();
     let active = window.active_tab();
     sync_address_text(state, active.id, &active.url);
     state
         .favicons
         .retain(|tab, _| window.index_of(*tab).is_some());
+    let palette = Palette::new(color, ui.visuals().dark_mode);
 
-    Panel::top("tabs").show_inside(ui, |ui| {
+    let strip_frame = Frame::new().fill(palette.strip).inner_margin(Margin {
+        left: 8,
+        right: 8,
+        top: 6,
+        bottom: 0,
+    });
+    Panel::top("tabs").frame(strip_frame).show_inside(ui, |ui| {
         egui::ScrollArea::horizontal()
             .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 2.0;
                     // How many tabs a drag in progress carries, for the overlay.
                     let mut dragging: Option<usize> = None;
                     for tab in &window.tabs {
                         let is_active = tab.id == window.active;
                         let is_selected = window.is_selected(tab.id);
-                        if let Some(texture) =
-                            favicon_texture(ui, state, tab.id, tab.favicon.as_ref())
-                        {
-                            ui.add(egui::Image::new((texture.id(), Vec2::splat(FAVICON_SIZE))));
-                        }
+                        let favicon = favicon_texture(ui, state, tab.id, tab.favicon.as_ref())
+                            .map(|t| t.id());
                         let title = truncate(tab.display_title(), TAB_TITLE_MAX_CHARS);
-                        let mut button =
-                            Button::selectable(is_active, title).sense(Sense::click_and_drag());
-                        if is_selected && !is_active {
-                            // A paler version of the active tab's fill, with
-                            // its outline, so a selected tab reads as "part
-                            // of the group" next to the active one.
-                            let selection = ui.visuals().selection;
-                            let fill = selection.bg_fill;
-                            // `selectable(false, ..)` paints no frame while
-                            // idle, so ask for one or the fill never shows.
-                            button = button
-                                .frame_when_inactive(true)
-                                .fill(egui::Color32::from_rgba_unmultiplied(
-                                    fill.r(),
-                                    fill.g(),
-                                    fill.b(),
-                                    96,
-                                ))
-                                .stroke(selection.stroke);
+                        let (response, close_clicked) =
+                            tab_widget(ui, &palette, is_active, is_selected, favicon, &title);
+                        if close_clicked {
+                            commands.push(Command::CloseTab(tab.id));
                         }
-                        let response = ui.add(button);
                         // A plain click activates; Ctrl (Cmd on macOS) adds
                         // or removes; Shift extends from the active tab.
                         let modifiers = ui.input(|i| i.modifiers);
@@ -175,10 +245,6 @@ pub fn draw(
                                 pointer,
                             });
                         }
-                        if ui.small_button("×").on_hover_text("Close tab").clicked() {
-                            commands.push(Command::CloseTab(tab.id));
-                        }
-                        ui.add_space(4.0);
                     }
                     if let (Some(count), Some(pointer)) = (dragging, ui.ctx().pointer_latest_pos())
                     {
@@ -197,8 +263,14 @@ pub fn draw(
                                 });
                             });
                     }
+                    ui.add_space(4.0);
+                    let on_strip = |text: &str, size: f32| {
+                        Button::new(RichText::new(text).color(palette.text_on_strip).size(size))
+                            .frame(false)
+                            .min_size(Vec2::new(28.0, TAB_HEIGHT))
+                    };
                     if ui
-                        .button("+")
+                        .add(on_strip("+", 20.0))
                         .on_hover_text(hint(keymap, CommandKind::NewTab, "New tab"))
                         .clicked()
                     {
@@ -207,99 +279,107 @@ pub fn draw(
                             url: None,
                         });
                     }
-                    ui.menu_button("☰", |ui| {
-                        if ui
-                            .button(hint(keymap, CommandKind::NewWindow, "New window"))
-                            .clicked()
-                        {
-                            commands.push(Command::NewWindow);
-                            ui.close();
-                        }
-                        if ui
-                            .button(hint(keymap, CommandKind::OpenSettings, "Settings"))
-                            .clicked()
-                        {
-                            commands.push(Command::OpenSettings);
-                            ui.close();
-                        }
-                        ui.separator();
-                        if ui.button(hint(keymap, CommandKind::Quit, "Quit")).clicked() {
-                            commands.push(Command::Quit);
-                            ui.close();
-                        }
-                    });
+                    egui::containers::menu::MenuButton::from_button(on_strip("☰", 16.0)).ui(
+                        ui,
+                        |ui| {
+                            if ui
+                                .button(hint(keymap, CommandKind::NewWindow, "New window"))
+                                .clicked()
+                            {
+                                commands.push(Command::NewWindow);
+                                ui.close();
+                            }
+                            if ui
+                                .button(hint(keymap, CommandKind::OpenSettings, "Settings"))
+                                .clicked()
+                            {
+                                commands.push(Command::OpenSettings);
+                                ui.close();
+                            }
+                            ui.separator();
+                            if ui.button(hint(keymap, CommandKind::Quit, "Quit")).clicked() {
+                                commands.push(Command::Quit);
+                                ui.close();
+                            }
+                        },
+                    );
                 });
             });
     });
 
-    Panel::top("toolbar").show_inside(ui, |ui| {
-        ui.horizontal(|ui| {
-            if ui
-                .add_enabled(active.can_go_back, Button::new("◀"))
-                .on_hover_text(hint(keymap, CommandKind::Back, "Back"))
-                .clicked()
-            {
-                commands.push(Command::Back(active.id));
-            }
-            if ui
-                .add_enabled(active.can_go_forward, Button::new("▶"))
-                .on_hover_text(hint(keymap, CommandKind::Forward, "Forward"))
-                .clicked()
-            {
-                commands.push(Command::Forward(active.id));
-            }
-            // Reload is always available (a hung load must be recoverable);
-            // Stop appears beside it while loading.
-            if ui
-                .button("⟳")
-                .on_hover_text(hint(keymap, CommandKind::Reload, "Reload"))
-                .clicked()
-            {
-                state.address_dirty = false;
-                commands.push(Command::Reload(active.id));
-            }
-            // Servo 0.7.0 cannot stop a load; the button shows the state but
-            // stays disabled so the UI does not promise what the engine lacks.
-            if active.load == LoadState::Loading {
-                ui.add_enabled(false, Button::new("✕"))
-                    .on_disabled_hover_text(format!(
-                        "{} (not supported by Servo 0.7.0)",
-                        hint(keymap, CommandKind::Stop, "Stop")
-                    ));
-            }
+    let toolbar_frame = Frame::new()
+        .fill(palette.toolbar)
+        .inner_margin(Margin::symmetric(8, 6));
+    Panel::top("toolbar")
+        .frame(toolbar_frame)
+        .show_inside(ui, |ui| {
+            ui.horizontal(|ui| {
+                if ui
+                    .add_enabled(active.can_go_back, Button::new("◀"))
+                    .on_hover_text(hint(keymap, CommandKind::Back, "Back"))
+                    .clicked()
+                {
+                    commands.push(Command::Back(active.id));
+                }
+                if ui
+                    .add_enabled(active.can_go_forward, Button::new("▶"))
+                    .on_hover_text(hint(keymap, CommandKind::Forward, "Forward"))
+                    .clicked()
+                {
+                    commands.push(Command::Forward(active.id));
+                }
+                // Reload is always available (a hung load must be recoverable);
+                // Stop appears beside it while loading.
+                if ui
+                    .button("⟳")
+                    .on_hover_text(hint(keymap, CommandKind::Reload, "Reload"))
+                    .clicked()
+                {
+                    state.address_dirty = false;
+                    commands.push(Command::Reload(active.id));
+                }
+                // Servo 0.7.0 cannot stop a load; the button shows the state but
+                // stays disabled so the UI does not promise what the engine lacks.
+                if active.load == LoadState::Loading {
+                    ui.add_enabled(false, Button::new("✕"))
+                        .on_disabled_hover_text(format!(
+                            "{} (not supported by Servo 0.7.0)",
+                            hint(keymap, CommandKind::Stop, "Stop")
+                        ));
+                }
 
-            let address_id = Id::new(("address", window.id));
-            let field = ui.add_sized(
-                ui.available_size(),
-                egui::TextEdit::singleline(&mut state.address_text)
-                    .id(address_id)
-                    .hint_text("Enter address"),
-            );
-            if field.changed() {
-                state.address_dirty = true;
-            }
-            // Select the text on focus, and again on Cmd+L while already
-            // focused, so the shortcut always means "replace the address".
-            let focus_requested = state.focus_address;
-            if state.focus_address {
-                state.focus_address = false;
-                field.request_focus();
-            }
-            if field.gained_focus() || focus_requested {
-                select_all(ui, address_id, state.address_text.chars().count());
-            }
-            if field.lost_focus()
-                && ui.input(|i| i.key_pressed(Key::Enter))
-                && let Some(url) = location_input_to_url(&state.address_text)
-            {
-                state.address_dirty = false;
-                commands.push(Command::Navigate {
-                    tab: active.id,
-                    url,
-                });
-            }
+                let address_id = Id::new(("address", window.id));
+                let field = ui.add_sized(
+                    ui.available_size(),
+                    egui::TextEdit::singleline(&mut state.address_text)
+                        .id(address_id)
+                        .hint_text("Enter address"),
+                );
+                if field.changed() {
+                    state.address_dirty = true;
+                }
+                // Select the text on focus, and again on Cmd+L while already
+                // focused, so the shortcut always means "replace the address".
+                let focus_requested = state.focus_address;
+                if state.focus_address {
+                    state.focus_address = false;
+                    field.request_focus();
+                }
+                if field.gained_focus() || focus_requested {
+                    select_all(ui, address_id, state.address_text.chars().count());
+                }
+                if field.lost_focus()
+                    && ui.input(|i| i.key_pressed(Key::Enter))
+                    && let Some(url) = location_input_to_url(&state.address_text)
+                {
+                    state.address_dirty = false;
+                    commands.push(Command::Navigate {
+                        tab: active.id,
+                        url,
+                    });
+                }
+            });
         });
-    });
 
     // The status text floats over the bottom-left corner of the page as an
     // overlay, so showing or hiding it never resizes the page.
@@ -422,11 +502,114 @@ fn tab_menu(
     });
 }
 
-pub fn background(ctx: &egui::Context) -> [f32; 4] {
-    ctx.global_style()
-        .visuals
-        .panel_fill
+/// The colour the window is cleared to before the chrome paints: the
+/// toolbar fill for `color`, so nothing flashes a different shade.
+pub fn background(ctx: &egui::Context, color: ChromeColor) -> [f32; 4] {
+    Palette::new(color, ctx.global_style().visuals.dark_mode)
+        .toolbar
         .to_normalized_gamma_f32()
+}
+
+/// One tab: a rounded-top block with the favicon, the title, and a close
+/// control, filled per its state. Returns the tab's response (click, drag,
+/// context menu) and whether the close control was clicked.
+fn tab_widget(
+    ui: &mut Ui,
+    palette: &Palette,
+    is_active: bool,
+    is_selected: bool,
+    favicon: Option<egui::TextureId>,
+    title: &str,
+) -> (egui::Response, bool) {
+    let font = TextStyle::Body.resolve(ui.style());
+    let text_color = if is_active {
+        ui.visuals().text_color()
+    } else {
+        palette.text_on_strip
+    };
+    let galley = ui
+        .painter()
+        .layout_no_wrap(title.to_string(), font.clone(), text_color);
+    let icon_width = if favicon.is_some() {
+        FAVICON_SIZE + 6.0
+    } else {
+        0.0
+    };
+    let width = TAB_PADDING_X + icon_width + galley.size().x + 8.0 + CLOSE_SIZE + TAB_PADDING_X;
+    let (rect, response) =
+        ui.allocate_exact_size(Vec2::new(width, TAB_HEIGHT), Sense::click_and_drag());
+    let close_rect = Rect::from_center_size(
+        Pos2::new(
+            rect.right() - TAB_PADDING_X - CLOSE_SIZE / 2.0 + 4.0,
+            rect.center().y,
+        ),
+        Vec2::splat(CLOSE_SIZE),
+    );
+    // Added after the tab, so it is on top and takes the pointer over it.
+    let close = ui.interact(close_rect, response.id.with("close"), Sense::click());
+
+    if ui.is_rect_visible(rect) {
+        let painter = ui.painter();
+        let fill = if is_active {
+            palette.toolbar
+        } else if is_selected {
+            palette.tab_selected
+        } else if response.hovered() || response.dragged() {
+            palette.tab_hover
+        } else {
+            palette.tab_idle
+        };
+        let stroke = if is_selected && !is_active {
+            Stroke::new(1.0_f32, palette.tab_outline)
+        } else {
+            Stroke::NONE
+        };
+        let corners = CornerRadius {
+            nw: TAB_CORNER,
+            ne: TAB_CORNER,
+            sw: 0,
+            se: 0,
+        };
+        painter.rect(rect, corners, fill, stroke, StrokeKind::Inside);
+
+        let mut x = rect.left() + TAB_PADDING_X;
+        if let Some(texture) = favicon {
+            let icon = Rect::from_center_size(
+                Pos2::new(x + FAVICON_SIZE / 2.0, rect.center().y),
+                Vec2::splat(FAVICON_SIZE),
+            );
+            painter.image(
+                texture,
+                icon,
+                Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+                Color32::WHITE,
+            );
+            x += icon_width;
+        }
+        painter.galley(
+            Pos2::new(x, rect.center().y - galley.size().y / 2.0),
+            galley,
+            text_color,
+        );
+
+        if close.hovered() {
+            let ring = if is_active {
+                Color32::from_black_alpha(28)
+            } else {
+                palette.tab_hover
+            };
+            painter.circle_filled(close_rect.center(), CLOSE_SIZE / 2.0, ring);
+        }
+        painter.text(
+            close_rect.center(),
+            Align2::CENTER_CENTER,
+            "×",
+            font,
+            text_color,
+        );
+    }
+    let close = close.on_hover_text("Close tab");
+    (response, close.clicked())
 }
 
 /// Replace the page area with an error panel. Returns true if the user

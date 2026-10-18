@@ -8,6 +8,14 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Added
 
+- A chrome colour per profile: Settings has a row of swatches (Slate, Ocean,
+  Forest, Plum, Rose, Amber, Graphite; `chrome_color` in `settings.toml`).
+  The tab strip takes the colour, the toolbar a pale wash of it, so windows
+  of different profiles tell apart at a glance.
+- Tabs are redrawn: taller, with more padding, rounded tops, the close
+  control inside the tab, a translucent fill that strengthens on hover and
+  selection, and the active tab in the toolbar's colour so it reads as
+  attached to the page.
 - Tab selection and tab moves. Ctrl-click (Cmd-click on macOS) adds a tab
   to the selection or removes it, Shift-click selects the range from the
   active tab; selected tabs are tinted. Right-click a tab for a menu that

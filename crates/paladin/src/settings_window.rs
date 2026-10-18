@@ -3,7 +3,7 @@
 //! the hotkey and profile editors here.
 
 use egui_glow::EguiGlow;
-use paladin_core::{CommandKind, Keymap, Settings};
+use paladin_core::{ChromeColor, CommandKind, Keymap, Settings};
 use paladin_engine::{Engine, EngineError, GlSurface, PhysicalSize};
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, WindowEvent};
@@ -162,7 +162,7 @@ impl SettingsWindow {
         let size = self.window.inner_size();
         self.egui.painter.clear(
             [size.width, size.height],
-            chrome::background(&self.egui.egui_ctx),
+            chrome::background(&self.egui.egui_ctx, settings.chrome_color),
         );
         self.egui.paint(&self.window);
         self.surface.present();
@@ -257,6 +257,34 @@ fn draw_settings(ui: &mut egui::Ui, settings: &mut Settings) -> FormActivity {
                         activity.edited |= normalise_url_setting(&mut settings.new_tab_url);
                     }
                     url_hint(ui, &settings.new_tab_url, new_tab.has_focus());
+                });
+                ui.end_row();
+
+                ui.label("Chrome colour");
+                ui.horizontal(|ui| {
+                    for color in ChromeColor::ALL {
+                        let [r, g, b] = color.rgb();
+                        let selected = settings.chrome_color == color;
+                        let stroke = if selected {
+                            egui::Stroke::new(2.0_f32, ui.visuals().strong_text_color())
+                        } else {
+                            egui::Stroke::new(1.0_f32, egui::Color32::from_black_alpha(40))
+                        };
+                        let swatch = ui
+                            .add(
+                                egui::Button::new("")
+                                    .fill(egui::Color32::from_rgb(r, g, b))
+                                    .stroke(stroke)
+                                    .corner_radius(6.0)
+                                    .min_size(egui::Vec2::splat(26.0)),
+                            )
+                            .on_hover_text(color.label());
+                        if swatch.clicked() && !selected {
+                            settings.chrome_color = color;
+                            activity.edited = true;
+                            activity.committed = true;
+                        }
+                    }
                 });
                 ui.end_row();
 

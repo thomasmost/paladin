@@ -65,7 +65,8 @@ setup is needed. `CLAUDE.md` describes how to work on the forks.
 
 Profiles live in `~/Library/Application Support/Paladin/profiles/<name>/` on
 macOS and `%APPDATA%\Paladin\profiles\<name>\` on Windows, holding
-`settings.toml` and Servo's `servo/` directory (cookies, local storage).
+`settings.toml` (homepage, new-tab URL, chrome colour) and Servo's `servo/`
+directory (cookies, local storage).
 
 ## Tests
 
@@ -149,11 +150,14 @@ or engine glue. Each item must pass.
    Shortcuts also work while the address bar has focus. Escape and
    Cmd+Left/Right are not shortcuts and do reach the page.
 11. **Settings.** Settings (Cmd+, or chosen with the mouse from the menu)
-    opens a window with Homepage, New tab URL, and the restore checkbox.
-    Edits are saved when a field loses focus or the window closes;
-    relaunching opens the new homepage, and `settings.toml` in the profile
-    directory holds it. With the settings window focused, Cmd+W closes it
-    and Cmd+Q quits.
+    opens a window with Homepage, New tab URL, a row of chrome colour
+    swatches, and the restore checkbox. Edits are saved when a field loses
+    focus or the window closes; relaunching opens the new homepage, and
+    `settings.toml` in the profile directory holds it. Click a swatch: every
+    browser window's tab strip takes that colour at once, the toolbar a pale
+    wash of it, and `chrome_color = "<name>"` lands in `settings.toml`; the
+    outlined swatch is the current one. With the settings window focused,
+    Cmd+W closes it and Cmd+Q quits.
 12. **Clean exit.** Closing the last window, Cmd+Q from a browser window or
     from the settings window, and Quit from the Dock menu (macOS) all exit
     with code 0 and no Servo error output.

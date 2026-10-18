@@ -20,4 +20,4 @@ pub use event::{EngineEvent, PendingTab, apply};
 pub use keymap::{CommandKind, KeyChord, Keymap, Platform};
 pub use model::{Browser, Favicon, LoadState, Tab, TabId, Window, WindowId};
 pub use profile::{Profile, ProfileError};
-pub use settings::{Settings, SettingsError};
+pub use settings::{ChromeColor, Settings, SettingsError};

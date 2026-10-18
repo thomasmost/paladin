@@ -353,6 +353,7 @@ impl BrowserWindow {
             .map(|w| (w.id, w.active_tab().display_title().to_string()))
             .collect();
         let profile = &browser.profile;
+        let chrome_color = browser.settings.chrome_color;
         let mut commands = Vec::new();
         let mut content_top_px = 0.0;
 
@@ -364,15 +365,13 @@ impl BrowserWindow {
             ..
         } = self;
         egui.run(window, |ui| {
-            commands = chrome::draw(
-                ui,
-                model,
-                &others,
+            let context = chrome::ChromeContext {
+                others: &others,
                 profile,
+                color: chrome_color,
                 engine_error,
-                chrome_state,
-                keymap,
-            );
+            };
+            commands = chrome::draw(ui, model, &context, chrome_state, keymap);
             let rect = ui.available_rect_before_wrap();
             let (top, size) = content_pixels(rect, ui.pixels_per_point());
             content_top_px = top;
@@ -420,7 +419,7 @@ impl BrowserWindow {
         let size = self.window.inner_size();
         self.egui.painter.clear(
             [size.width, size.height],
-            chrome::background(&self.egui.egui_ctx),
+            chrome::background(&self.egui.egui_ctx, chrome_color),
         );
         self.egui.paint(&self.window);
         surface.present();
