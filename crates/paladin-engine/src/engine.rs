@@ -23,6 +23,8 @@ pub static INFO: EngineInfo = EngineInfo {
     supports_stop: false,
     // The value Servo's own shell uses per wheel line.
     wheel_line_px: 76.0,
+    // Servo runs no browser extensions.
+    extensions: None,
 };
 
 #[derive(Clone)]
