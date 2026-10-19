@@ -6,7 +6,7 @@ model, the egui chrome, and the winit application come from
 with Nautilus (Chromium). This repository holds only what is Servo's: the
 engine crate, the forks, and the binary that brands it.
 
-_Last updated: 2026-10-19 (moved onto osmena)._
+_Last updated: 2026-10-19 (handoff after the move onto osmena)._
 
 ## Architecture
 
@@ -222,3 +222,36 @@ A task is complete only when:
   issues Paladin depends on and the features each one blocks. Add an entry
   when a bug or feature turns out to be upstream; re-check every `S` entry on
   a Servo bump.
+
+## Status and handoff (2026-10-19)
+
+What changed today: `paladin-core` and the binary's app, window, chrome,
+menus, routing, settings window and process glue moved to osmena; the engine
+crate implements osmena's traits; the binary is `brand.rs` plus `main.rs`.
+About 7,800 lines left this repository. The Servo and stylo forks, the
+patch table, the content-process model, the engine tests and the Web
+Animations pages are untouched.
+
+Verified on Windows: `cargo test --workspace` (engine unit tests, `headless`,
+`web_animations`), clippy, formatting, icons unchanged, and a launch that
+renders example.com with the Paladin title and icon. Not verified: the manual
+checklist beyond launch (run it; the behaviour moved with its tests but was
+not exercised by hand), macOS, and the CI run for the migration commit, which
+was still building when this was written (Servo takes most of an hour cold).
+
+Open items: the README's Todo list still applies; the osmena pin
+(`rev` in the workspace `Cargo.toml`) should move whenever osmena changes
+something a browser notices; a Servo bump that moves winit, egui or glow is
+an osmena change first.
+
+All three checkouts live side by side under `vibes/browser-project/`
+(`osmena`, `paladin`, `nautilus`); Paladin's Servo and stylo fork checkouts
+stay at `~/vibes/servo` and `~/vibes/stylo`. `~/.cargo/config.toml` on the
+development Windows box carries a `[patch."https://github.com/thomasmost/osmena"]`
+table pointing at the osmena checkout, so both browsers build against
+uncommitted osmena changes; while it is active `cargo` rewrites the
+browsers' `Cargo.lock` with path sources for the osmena crates. Before
+committing a browser's lock, disable the table (rename its key), run
+`cargo metadata` to put the git sources back, commit, and re-enable it.
+Cargo fetches the pinned revision from GitHub even when the table is
+active, so GitHub must be reachable.

@@ -5135,6 +5135,7 @@ dependencies = [
 [[package]]
 name = "osmena-chrome"
 version = "0.1.0"
+source = "git+https://github.com/thomasmost/osmena?rev=9c1a4dbd4f9c6f8c9d9c1b0d2bb3f09fc0f34958#9c1a4dbd4f9c6f8c9d9c1b0d2bb3f09fc0f34958"
 dependencies = [
  "dpi",
  "egui",
@@ -5154,6 +5155,7 @@ dependencies = [
 [[package]]
 name = "osmena-core"
 version = "0.1.0"
+source = "git+https://github.com/thomasmost/osmena?rev=9c1a4dbd4f9c6f8c9d9c1b0d2bb3f09fc0f34958#9c1a4dbd4f9c6f8c9d9c1b0d2bb3f09fc0f34958"
 dependencies = [
  "directories",
  "keyboard-types",
@@ -5165,6 +5167,7 @@ dependencies = [
 [[package]]
 name = "osmena-engine"
 version = "0.1.0"
+source = "git+https://github.com/thomasmost/osmena?rev=9c1a4dbd4f9c6f8c9d9c1b0d2bb3f09fc0f34958#9c1a4dbd4f9c6f8c9d9c1b0d2bb3f09fc0f34958"
 dependencies = [
  "dpi",
  "glow",
@@ -5178,6 +5181,7 @@ dependencies = [
 [[package]]
 name = "osmena-shell"
 version = "0.1.0"
+source = "git+https://github.com/thomasmost/osmena?rev=9c1a4dbd4f9c6f8c9d9c1b0d2bb3f09fc0f34958#9c1a4dbd4f9c6f8c9d9c1b0d2bb3f09fc0f34958"
 dependencies = [
  "clap",
  "dpi",
@@ -5197,6 +5201,7 @@ dependencies = [
 [[package]]
 name = "osmena-xtask"
 version = "0.1.0"
+source = "git+https://github.com/thomasmost/osmena?rev=9c1a4dbd4f9c6f8c9d9c1b0d2bb3f09fc0f34958#9c1a4dbd4f9c6f8c9d9c1b0d2bb3f09fc0f34958"
 dependencies = [
  "icns",
  "ico",
@@ -11001,3 +11006,23 @@ checksum = "27bc9d5b815bc103f142aa054f561d9187d191692ec7c2d1e2b4737f8dbd7296"
 dependencies = [
  "zune-core",
 ]
+
+[[patch.unused]]
+name = "osmena-chrome"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "osmena-core"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "osmena-engine"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "osmena-shell"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "osmena-xtask"
+version = "0.1.0"
