@@ -28,6 +28,9 @@ sibling; this repository holds what is Servo's.
 - **Sleek by default.** No system title bar: the tab strip is the title
   bar, with the window controls at its end. "Use the system title bar and
   borders" in Settings brings the frame back.
+- **Tab folders and bookmark groups.** Fold a selection of tabs behind
+  one chip in the strip, or bookmark it as a named group to reopen from
+  the menu.
 - **Keyboard first.** Every control is a command with Chromium's shortcut
   (Cmd for Ctrl on macOS), chords work even while the address bar has
   focus, and Settings remaps them the way a game's controls screen does:
@@ -222,10 +225,25 @@ or engine glue. Each item must pass.
     slot Ctrl+Y: New tab loses it and a note under the table says so.
     Right-click a slot to clear it; "Reset to defaults" puts everything
     back and the file lists the defaults.
-12. **Clean exit.** Closing the last window, Cmd+Q from a browser window or
+12. **Folders and bookmarks.** Open three tabs. Right-click the second:
+    the menu has "Close all selected (1)" (disabled with one selected),
+    "Move tab to folder…", and "Bookmark all selected (1)…". Pick "Move
+    tab to folder…": a prompt over the page offers "Folder A"; Enter.
+    The strip shows a chip "▸ Folder A (1)" in the tab's place; click
+    it: a list drops down with the tab, and clicking the tab there
+    activates it. Right-click the chip: Expand, Rename…, Ungroup, Close
+    folder (1 tab). Expand: the tab appears after the chip, which reads
+    "▾ Folder A". Ctrl-click the other two tabs, right-click one, "Move
+    2 tabs to folder…", pick Folder A from the existing-folder choice:
+    the folder holds three tabs, together. "Bookmark all selected…" on a
+    selection asks for a group name; type Work, Enter: the profile has
+    `bookmarks.toml` with the pages, and ☰ → Bookmarks → Work lists
+    them with "Open all (n)", which opens each in a new tab. Folders are
+    gone after a relaunch; bookmarks stay.
+13. **Clean exit.** Closing the last window, Cmd+Q from a browser window or
     from the settings window, and Quit from the Dock menu (macOS) all exit
     with code 0 and no Servo error output.
-13. **Web Animations.** Open `https://bsky.app`: the blue splash screen fades
+14. **Web Animations.** Open `https://bsky.app`: the blue splash screen fades
     out and the landing page or feed renders and scrolls. (Script animations
     are sampled by Paladin's Servo and stylo forks; see
     `docs/upstream-issues.md`, "Carried in the fork".)
