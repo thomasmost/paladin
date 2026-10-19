@@ -25,8 +25,13 @@ sibling; this repository holds what is Servo's.
   profile from its context menu.
 - **Your colour.** Settings offers a row of swatches that tint the tab strip
   and toolbar per profile.
-- **Keyboard first.** Every control is a command with a platform-native
-  shortcut, and chords work even while the address bar has focus.
+- **Sleek by default.** No system title bar: the tab strip is the title
+  bar, with the window controls at its end. "Use the system title bar and
+  borders" in Settings brings the frame back.
+- **Keyboard first.** Every control is a command with Chromium's shortcut
+  (Cmd for Ctrl on macOS), chords work even while the address bar has
+  focus, and Settings remaps them the way a game's controls screen does:
+  a primary and a secondary slot per action, click and press.
 - **Web Animations.** Script-driven CSS animations are sampled by Paladin's
   forks of Servo and stylo, so pages such as bsky.app render past their
   splash screens.
@@ -116,9 +121,14 @@ directory (cookies, local storage).
 Run on macOS with `cargo run` after any change to the chrome, input handling,
 or engine glue. Each item must pass.
 
-1. **Launch.** A window titled Paladin opens with one tab at the homepage,
-   the page renders, and the Dock (macOS) or title bar (Windows) shows the
-   Paladin logo.
+1. **Launch.** A window opens with one tab at the homepage and the page
+   renders. There is no system title bar: on Windows the tab strip ends
+   in the ☰ menu and the minimize, maximize, and close controls, and the
+   taskbar shows the Paladin logo with the title Paladin; on macOS the
+   traffic lights sit at the strip's left end and the Dock shows the
+   logo. Dragging the strip's empty space moves the window,
+   double-clicking it maximizes (zooms), and on Windows the pointer
+   becomes a resize arrow at every edge and corner.
 2. **Address bar.** Type `example.com` and press Enter: the page loads, the
    tab title becomes "Example Domain", and the address bar shows
    `https://example.com/`. Typing `localhost:8080` targets `http://`.
@@ -178,23 +188,40 @@ or engine glue. Each item must pass.
    other working. Clicking on the page outside an open menu closes the menu
    without the click reaching the page.
 10. **Shortcuts.** With Cmd on macOS or Ctrl on Windows: T new tab, W close
-   tab, Shift+W close window, N new window, L focus the address bar with
-   its text selected, R reload, period Stop (only logs a warning: Servo 0.7.0
-   cannot stop a load), Shift+] and Shift+[ next and
-   previous tab (wrapping), comma opens settings, Q quits. Back and forward
-   are Cmd+[ and Cmd+] on macOS and Alt+Left and Alt+Right on Windows. A
-   chord held down fires once, and none of its key strokes reach the page.
-   Shortcuts also work while the address bar has focus. Escape and
-   Cmd+Left/Right are not shortcuts and do reach the page.
+   tab (also Ctrl+F4 on Windows), Shift+T reopens the last closed tab,
+   Shift+W close window, N new window, L focus the address bar with its
+   text selected (also Alt+D on Windows), R reload (also F5 on Windows),
+   period Stop (only logs a warning: Servo 0.7.0 cannot
+   stop a load), Shift+] and Shift+[ on macOS or Tab and
+   Shift+Tab and PgDn/PgUp everywhere next and previous tab (wrapping),
+   1 to 8 the tab at that position and 9 the last tab, comma opens
+   settings, Q quits. Back and forward are Cmd+[ and Cmd+] on macOS and
+   Alt+Left and Alt+Right on Windows; the homepage is Cmd+Shift+H or
+   Alt+Home; F11 (Ctrl+Cmd+F on macOS) shows the page alone and again
+   brings the chrome back. A chord held down fires once, and none of its
+   key strokes reach the page. Shortcuts also work while the address bar
+   has focus. Escape and Cmd+Left/Right are not shortcuts and do reach the
+   page.
 11. **Settings.** Settings (Cmd+, or chosen with the mouse from the menu)
     opens a window with Homepage, New tab URL, a row of chrome colour
-    swatches, and the restore checkbox. Edits are saved when a field loses
+    swatches, the "Use the system title bar and borders" checkbox, the
+    restore checkbox, and the Keyboard shortcuts table. Edits are saved when a field loses
     focus or the window closes; relaunching opens the new homepage, and
     `settings.toml` in the profile directory holds it. Click a swatch: every
     browser window's tab strip takes that colour at once, the toolbar a pale
     wash of it, and `chrome_color = "<name>"` lands in `settings.toml`; the
     outlined swatch is the current one. With the settings window focused,
     Cmd+W closes it and Cmd+Q quits.
+    **Title bar.** Tick "Use the system title bar and borders": every open
+    window gets the system frame at once on Windows (on macOS, the next
+    window opened); untick it and the strip is the title bar again.
+    **Shortcuts.** Click the primary slot of New tab: it reads "Press
+    keys…"; press Ctrl+Y (Cmd+Y): the slot shows it, `keymap.toml` in the
+    profile directory holds `new-tab = ["Ctrl+KeyY"]` (Meta on macOS), and
+    Ctrl+Y opens a tab while Ctrl+T no longer does. Give Reload's secondary
+    slot Ctrl+Y: New tab loses it and a note under the table says so.
+    Right-click a slot to clear it; "Reset to defaults" puts everything
+    back and the file lists the defaults.
 12. **Clean exit.** Closing the last window, Cmd+Q from a browser window or
     from the settings window, and Quit from the Dock menu (macOS) all exit
     with code 0 and no Servo error output.
@@ -256,6 +283,9 @@ Upstream causes and the features they block are tracked in
   fields such as Google's search box cut off descenders.
 - No search engine: address-bar text that is not a URL is ignored.
 - Stop is disabled while a page loads (Servo 0.7.0 has no API for it).
+- Without the system title bar, Windows 11's snap-layouts flyout on the
+  maximize control is not available (snap by dragging still is), and the
+  frameless window has not been tried on macOS.
 - No macOS application menu: winit's default menu is turned off so that
   Cmd+Q reaches Paladin's own shortcut handling, which also removes Cmd+H
   (hide) and Cmd+M (minimize). A custom menu is planned.
