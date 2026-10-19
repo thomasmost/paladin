@@ -6,6 +6,15 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- The model, the egui chrome, the settings window, and the winit
+  application now come from the [osmena](https://github.com/thomasmost/osmena)
+  crates, shared with Nautilus (Paladin's Chromium sibling). `paladin-core`
+  is gone; `paladin-engine` implements osmena's `Engine` and `TabHost`
+  traits; the binary is the brand, Servo's content-process preamble, and
+  the command line. No user-visible change.
+
 ### Added
 
 - A chrome colour per profile: Settings has a row of swatches (Slate, Ocean,

@@ -1,33 +1,29 @@
 //! Servo construction, the event-loop waker bridge, and the event queue.
 
-use std::fmt;
 use std::panic::{AssertUnwindSafe, PanicHookInfo, catch_unwind};
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::{Arc, Once};
 
-use paladin_core::{EngineEvent, PendingTab};
+use osmena_core::{EngineEvent, EngineInfo, PendingTab};
+use osmena_engine::raw_window_handle::{DisplayHandle, WindowHandle};
+use osmena_engine::{EngineError, PhysicalSize, Waker};
 use servo::{EventLoopWaker, Opts, Preferences, Servo, ServoBuilder};
 
 use crate::delegate::DelegateState;
+use crate::host::{GlSurface, TabHost};
 
-/// Wakes the application's event loop from any thread. Servo calls this
-/// when it has work for the main thread; the app then calls
-/// [`Engine::spin`].
-pub trait Waker: Send + Sync + 'static {
-    fn wake(&self);
-}
-
-#[derive(Debug)]
-pub struct EngineError(pub String);
-
-impl fmt::Display for EngineError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl std::error::Error for EngineError {}
+/// What the shell needs to know about this engine. The version is the
+/// `servo` crate pinned in this crate's `Cargo.toml`.
+pub static INFO: EngineInfo = EngineInfo {
+    name: "Servo",
+    version: "0.7.0",
+    data_dir: "servo",
+    // Servo 0.7.0 has no API to stop a load.
+    supports_stop: false,
+    // The value Servo's own shell uses per wheel line.
+    wheel_line_px: 76.0,
+};
 
 #[derive(Clone)]
 struct ServoWaker(Arc<dyn Waker>);
@@ -119,31 +115,54 @@ impl Engine {
         Ok(Engine { servo, delegate })
     }
 
-    /// Run one iteration of Servo's embedder loop: delivers delegate
-    /// callbacks (which become [`EngineEvent`]s) and updates painting state.
-    /// Call after every window event and every [`Waker::wake`].
-    pub fn spin(&self) {
-        self.servo.spin_event_loop();
-    }
-
-    /// Take every event produced since the last call.
-    pub fn drain_events(&self) -> Vec<EngineEvent> {
-        self.delegate.drain()
-    }
-
-    /// Drop a tab that page content opened but that no window adopted.
-    pub fn discard_pending(&self, pending: PendingTab) {
-        if self.delegate.take_pending(pending).is_none() {
-            log::debug!("no pending tab {pending:?} to discard");
-        }
-    }
-
     pub(crate) fn servo(&self) -> &Servo {
         &self.servo
     }
 
     pub(crate) fn delegate(&self) -> &Rc<DelegateState> {
         &self.delegate
+    }
+}
+
+impl osmena_engine::Engine for Engine {
+    /// Servo renders through its own GL context on the window, which the
+    /// chrome shares.
+    type Surface = GlSurface;
+    type Host = TabHost;
+
+    /// Run one iteration of Servo's embedder loop: delivers delegate
+    /// callbacks (which become [`EngineEvent`]s) and updates painting state.
+    fn spin(&self) {
+        self.servo.spin_event_loop();
+    }
+
+    fn drain_events(&self) -> Vec<EngineEvent> {
+        self.delegate.drain()
+    }
+
+    /// Drop a tab that page content opened but that no window adopted.
+    fn discard_pending(&self, pending: PendingTab) {
+        if self.delegate.take_pending(pending).is_none() {
+            log::debug!("no pending tab {pending:?} to discard");
+        }
+    }
+
+    fn open_surface(
+        &self,
+        display: DisplayHandle<'_>,
+        window: WindowHandle<'_>,
+        size: PhysicalSize<u32>,
+    ) -> Result<GlSurface, EngineError> {
+        GlSurface::new(display, window, size)
+    }
+
+    fn open_host(
+        &self,
+        surface: &GlSurface,
+        _window: WindowHandle<'_>,
+        scale: f32,
+    ) -> Result<TabHost, EngineError> {
+        TabHost::new(self, surface, scale)
     }
 }
 

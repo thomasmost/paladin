@@ -6,7 +6,8 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use paladin_core::{EngineEvent, LoadState, PendingTab, TabId};
+use osmena_core::{EngineEvent, LoadState, PendingTab, TabId};
+use osmena_engine::{Engine as _, TabHost as _};
 use paladin_engine::{Engine, PhysicalSize, TabHost, Waker};
 
 struct NoopWaker;

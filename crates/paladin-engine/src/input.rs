@@ -1,70 +1,13 @@
-//! Paladin's input events and their conversion to Servo's. The app builds
-//! `EngineInput` from winit events; this keeps winit out of the engine and
-//! Servo out of the app.
+//! Conversion of the browser's input events (`osmena_core::EngineInput`)
+//! to Servo's. The shell builds the events from winit; this keeps winit
+//! out of the engine and Servo out of the shell.
 
-use keyboard_types::{Code, Key, KeyState, Location, Modifiers};
+use osmena_core::{ButtonAction, EngineInput, MouseButton};
 use servo::{
     CompositionEvent, CompositionState, DevicePoint, ImeEvent, InputEvent, KeyboardEvent,
     MouseButton as ServoMouseButton, MouseButtonAction, MouseButtonEvent, MouseLeftViewportEvent,
     MouseMoveEvent, WheelDelta, WheelEvent, WheelMode,
 };
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum MouseButton {
-    Primary,
-    Secondary,
-    Auxiliary,
-    Back,
-    Forward,
-    Other(u16),
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ButtonAction {
-    Down,
-    Up,
-}
-
-/// A key event in `keyboard-types` terms (the W3C UI Events model).
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct KeyInput {
-    pub state: KeyState,
-    pub key: Key,
-    pub code: Code,
-    pub location: Location,
-    pub modifiers: Modifiers,
-    pub repeat: bool,
-}
-
-/// Input for a tab. Positions are physical pixels relative to the top-left
-/// of the page area (below the toolbar).
-#[derive(Clone, Debug, PartialEq)]
-pub enum EngineInput {
-    MouseMove {
-        x: f32,
-        y: f32,
-    },
-    MouseButton {
-        action: ButtonAction,
-        button: MouseButton,
-        x: f32,
-        y: f32,
-    },
-    /// The pointer left the page area.
-    MouseLeft,
-    /// Scroll by `(dx, dy)` pixels with the pointer at `(x, y)`.
-    Wheel {
-        dx: f64,
-        dy: f64,
-        x: f32,
-        y: f32,
-    },
-    Key(KeyInput),
-    ImeStart,
-    ImePreedit(String),
-    ImeCommit(String),
-    ImeDismissed,
-}
 
 pub(crate) fn to_servo(input: EngineInput) -> InputEvent {
     match input {
@@ -129,7 +72,9 @@ mod tests {
         WebViewPoint, WheelMode,
     };
 
-    use super::{ButtonAction, EngineInput, KeyInput, MouseButton, to_servo};
+    use osmena_core::{ButtonAction, EngineInput, KeyInput, MouseButton};
+
+    use super::to_servo;
 
     /// The device-pixel position a mapped event carries.
     fn device_point(point: &WebViewPoint) -> (f32, f32) {

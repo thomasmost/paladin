@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/paladin-core", "crates/paladin-engine", "crates/paladin", "xtask"]
+members = ["crates/paladin-engine", "crates/paladin", "xtask"]
 # `cargo run` with no package flag runs the browser.
 default-members = ["crates/paladin"]
 resolver = "3"
@@ -11,13 +11,18 @@ rust-version = "1.88"
 publish = false
 
 [workspace.dependencies]
-# Pinned to the versions Servo 0.7.0's own shell uses. They share a GL
-# context and raw window handles with Servo, so bump them together with
-# `servo` (see CLAUDE.md).
-winit = "=0.30.13"
-egui = "=0.34.3"
-egui-winit = { version = "=0.34.3", default-features = false }
-egui_glow = { version = "=0.34.3", features = ["winit"] }
+# The shared shell (model, chrome, winit app): https://github.com/thomasmost/osmena.
+# Pinned by revision; the crates version together, so move every `rev` at
+# once. For local work, patch the source to a checkout in
+# ~/.cargo/config.toml (see osmena's README). osmena pins winit, egui, and
+# glow to the versions Servo 0.7.0's own shell uses; they share a GL
+# context and raw window handles with Servo, so a Servo bump that moves
+# them is an osmena bump first (see CLAUDE.md).
+osmena-core = { git = "https://github.com/thomasmost/osmena", rev = "9c1a4dbd4f9c6f8c9d9c1b0d2bb3f09fc0f34958" }
+osmena-engine = { git = "https://github.com/thomasmost/osmena", rev = "9c1a4dbd4f9c6f8c9d9c1b0d2bb3f09fc0f34958" }
+osmena-shell = { git = "https://github.com/thomasmost/osmena", rev = "9c1a4dbd4f9c6f8c9d9c1b0d2bb3f09fc0f34958" }
+osmena-xtask = { git = "https://github.com/thomasmost/osmena", rev = "9c1a4dbd4f9c6f8c9d9c1b0d2bb3f09fc0f34958" }
+# Servo's own GL crates, at the versions it pins.
 glow = "=0.17.0"
 surfman = "=0.14.0"
 raw-window-handle = "0.6"

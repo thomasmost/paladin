@@ -3,7 +3,10 @@
 A desktop web browser for macOS and Windows, written in Rust. Pages render
 through Servo, the experimental Rust browser engine; the window chrome (tab
 strip, address bar, settings) is drawn with egui. There is no HTML in the
-chrome.
+chrome. The model and the chrome are
+[osmena](https://github.com/thomasmost/osmena), the shell Paladin shares
+with [Nautilus](https://github.com/thomasmost/nautilus), its Chromium
+sibling; this repository holds what is Servo's.
 
 ## Features
 
@@ -27,8 +30,9 @@ chrome.
 - **Web Animations.** Script-driven CSS animations are sampled by Paladin's
   forks of Servo and stylo, so pages such as bsky.app render past their
   splash screens.
-- **Engine-agnostic design.** Only one crate imports Servo; the model and
-  the UI speak in pure, unit-tested commands and events.
+- **Engine-agnostic design.** Only one crate imports Servo, and it
+  implements osmena's `Engine` trait; the model and the UI are osmena's,
+  shared with Nautilus and unit-tested without an engine.
 
 ## Stack
 
@@ -36,8 +40,8 @@ chrome.
 | --------- | ----------------------------------------------------------------- |
 | Language  | Rust 1.97.1 (pinned in `rust-toolchain.toml`), edition 2024       |
 | Engine    | Servo 0.7.0 (the `servo` crate), confined to `crates/paladin-engine` |
-| Chrome    | egui 0.34 on winit 0.30, rendered through egui_glow               |
-| Graphics  | surfman GL contexts (Servo's), ANGLE on Windows                   |
+| Shell     | [osmena](https://github.com/thomasmost/osmena): the model, the egui 0.34 chrome on winit 0.30, the settings window, pinned by git revision |
+| Graphics  | surfman GL contexts (Servo's), ANGLE on Windows; the chrome shares Servo's context |
 | Packaging | cargo-packager: `.app` and `.dmg` on macOS, NSIS installer on Windows |
 | CI        | GitHub Actions on macOS and Windows runners                       |
 
@@ -45,10 +49,9 @@ chrome.
 
 ```
 crates/
-  paladin-core/    Servo-free model: windows, tabs, commands, keymap, settings, profiles
-  paladin-engine/  Servo glue: engine, GL surfaces, tab host, delegate -> events
-  paladin/         The binary: winit app, egui chrome, dispatch loop, packaging metadata
-xtask/             `cargo xtask icons` (logo -> icns/ico/png), `cargo xtask angle-dlls`
+  paladin-engine/  Servo glue: osmena's Engine and TabHost over Servo, GL surfaces, delegate -> events
+  paladin/         The binary: the Brand, Servo's content-process preamble, the command line, packaging metadata
+xtask/             `cargo xtask icons` (osmena's icon task), `cargo xtask angle-dlls`
 assets/
   logo.png         The knight-on-pegasus artwork
   logo.svg         Frames logo.png in the rounded tile the icons use
@@ -73,6 +76,12 @@ Servo and stylo are built from Paladin's forks (`thomasmost/servo`,
 `dist/*` branches that cargo fetches like any git dependency, so no extra
 setup is needed. `CLAUDE.md` describes how to work on the forks.
 
+The model, chrome, and winit application come from the osmena crates,
+pinned by git revision in the workspace `Cargo.toml`. To change them
+alongside Paladin, check osmena out next to this repository and patch the
+source to it in `~/.cargo/config.toml` (osmena's README has the table);
+then bump the `rev`s here once the change is pushed.
+
 1. **Build and run:** `cargo run` opens a window at the homepage. Pass URLs
    to open them as tabs, `--profile <name>` to use another profile, or
    `--single-process` to keep every tab in the browser process.
@@ -95,9 +104,10 @@ directory (cookies, local storage).
 
 ## Tests
 
-- `cargo test --workspace` — unit tests in `paladin-core` and `paladin`, plus
-  the headless engine test in `paladin-engine`, which starts Servo without a
-  window and loads a page (slow the first time).
+- `cargo test --workspace` — the engine's unit tests plus its two test
+  binaries, `headless` and `web_animations`, which start Servo without a
+  window (slow the first time). The model, chrome, and routing tests live
+  in osmena.
 - `cargo clippy --workspace --all-targets -- -D warnings` and
   `cargo fmt --all --check` — what CI runs.
 

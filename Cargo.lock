@@ -5133,6 +5133,77 @@ dependencies = [
 ]
 
 [[package]]
+name = "osmena-chrome"
+version = "0.1.0"
+dependencies = [
+ "dpi",
+ "egui",
+ "keyboard-types",
+ "log",
+ "muda",
+ "objc2 0.6.5",
+ "objc2-app-kit 0.3.2",
+ "objc2-foundation 0.3.2",
+ "osmena-core",
+ "png",
+ "url",
+ "windows-sys 0.61.2",
+ "winit",
+]
+
+[[package]]
+name = "osmena-core"
+version = "0.1.0"
+dependencies = [
+ "directories",
+ "keyboard-types",
+ "serde",
+ "toml 1.1.8+spec-1.1.0",
+ "url",
+]
+
+[[package]]
+name = "osmena-engine"
+version = "0.1.0"
+dependencies = [
+ "dpi",
+ "glow",
+ "keyboard-types",
+ "log",
+ "osmena-core",
+ "raw-window-handle",
+ "url",
+]
+
+[[package]]
+name = "osmena-shell"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "dpi",
+ "egui",
+ "egui-winit",
+ "egui_glow",
+ "glow",
+ "log",
+ "osmena-chrome",
+ "osmena-core",
+ "osmena-engine",
+ "url",
+ "windows-sys 0.61.2",
+ "winit",
+]
+
+[[package]]
+name = "osmena-xtask"
+version = "0.1.0"
+dependencies = [
+ "icns",
+ "ico",
+ "resvg",
+]
+
+[[package]]
 name = "owned_ttf_parser"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5187,34 +5258,9 @@ name = "paladin"
 version = "0.1.0"
 dependencies = [
  "clap",
- "egui",
- "egui-winit",
- "egui_glow",
- "keyboard-types",
- "log",
- "muda",
- "objc2 0.6.5",
- "objc2-app-kit 0.3.2",
- "objc2-foundation 0.3.2",
- "paladin-core",
+ "osmena-shell",
  "paladin-engine",
- "png",
- "url",
- "windows-sys 0.61.2",
- "winit",
  "winresource",
-]
-
-[[package]]
-name = "paladin-core"
-version = "0.1.0"
-dependencies = [
- "directories",
- "keyboard-types",
- "serde",
- "tempfile",
- "toml 1.1.8+spec-1.1.0",
- "url",
 ]
 
 [[package]]
@@ -5227,7 +5273,8 @@ dependencies = [
  "keyboard-types",
  "libc",
  "log",
- "paladin-core",
+ "osmena-core",
+ "osmena-engine",
  "raw-window-handle",
  "rustls",
  "servo",
@@ -10730,9 +10777,7 @@ checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
 name = "xtask"
 version = "0.1.0"
 dependencies = [
- "icns",
- "ico",
- "resvg",
+ "osmena-xtask",
 ]
 
 [[package]]

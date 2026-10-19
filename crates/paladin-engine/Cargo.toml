@@ -4,10 +4,11 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
-description = "Servo glue: the only crate that imports the servo crate"
+description = "Servo glue: the only crate that imports the servo crate; implements osmena's Engine"
 
 [dependencies]
-paladin-core = { path = "../paladin-core" }
+osmena-core = { workspace = true }
+osmena-engine = { workspace = true }
 dpi = { workspace = true }
 euclid = { workspace = true }
 glow = { workspace = true }

@@ -3,7 +3,7 @@
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, VecDeque};
 
-use paladin_core::{EngineEvent, Favicon, LoadState, PendingTab, TabId};
+use osmena_core::{EngineEvent, Favicon, LoadState, PendingTab, TabId};
 use servo::{
     ConsoleLogLevel, CreateNewWebViewRequest, Image, LoadStatus, PixelFormat, ServoDelegate,
     ServoError, WebView, WebViewDelegate, WebViewId,
