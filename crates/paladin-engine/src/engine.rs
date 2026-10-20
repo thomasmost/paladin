@@ -5,7 +5,7 @@ use std::path::Path;
 use std::rc::Rc;
 use std::sync::{Arc, Once};
 
-use osmena_core::{EngineEvent, EngineInfo, PendingTab};
+use osmena_core::{EngineEvent, EngineInfo, PageTools, PendingTab};
 use osmena_engine::raw_window_handle::{DisplayHandle, WindowHandle};
 use osmena_engine::{EngineError, PhysicalSize, Waker};
 use servo::{EventLoopWaker, Opts, Preferences, Servo, ServoBuilder};
@@ -25,6 +25,10 @@ pub static INFO: EngineInfo = EngineInfo {
     wheel_line_px: 76.0,
     // Servo runs no browser extensions.
     extensions: None,
+    // Servo 0.7.0 has no downloads, printing, source view, or developer
+    // tools window to offer; the page menu keeps the model's entries and
+    // the editing basics.
+    page_tools: PageTools::NONE,
 };
 
 #[derive(Clone)]

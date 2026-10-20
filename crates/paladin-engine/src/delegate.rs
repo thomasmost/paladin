@@ -3,10 +3,13 @@
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, VecDeque};
 
-use osmena_core::{EngineEvent, Favicon, LoadState, PendingTab, TabId};
+use osmena_core::{
+    EditState, EngineEvent, Favicon, LoadState, Media, MediaKind, PageContext, PendingTab, TabId,
+};
 use servo::{
-    ConsoleLogLevel, CreateNewWebViewRequest, Image, LoadStatus, PixelFormat, ServoDelegate,
-    ServoError, WebView, WebViewDelegate, WebViewId,
+    ConsoleLogLevel, ContextMenu, ContextMenuElementInformationFlags, CreateNewWebViewRequest,
+    EmbedderControl, EmbedderControlId, Image, LoadStatus, PixelFormat, ServoDelegate, ServoError,
+    WebView, WebViewDelegate, WebViewId,
 };
 use url::Url;
 
@@ -21,6 +24,9 @@ pub(crate) struct DelegateState {
     /// model adopts them.
     pending: RefCell<HashMap<PendingTab, WebView>>,
     next_pending: Cell<u64>,
+    /// The context menu Servo asked for in each tab and has not heard
+    /// back about; dropping one tells Servo it was dismissed.
+    context_menus: RefCell<HashMap<TabId, ContextMenu>>,
 }
 
 impl DelegateState {
@@ -43,6 +49,12 @@ impl DelegateState {
 
     pub(crate) fn drain(&self) -> Vec<EngineEvent> {
         self.events.borrow_mut().drain(..).collect()
+    }
+
+    /// The context menu Servo is waiting on for `tab`, if any. The caller
+    /// answers it or drops it (which dismisses it).
+    pub(crate) fn take_context_menu(&self, tab: TabId) -> Option<ContextMenu> {
+        self.context_menus.borrow_mut().remove(&tab)
     }
 
     pub(crate) fn push(&self, event: EngineEvent) {
@@ -151,7 +163,56 @@ impl WebViewDelegate for DelegateState {
         let pending = PendingTab(self.next_pending.get());
         self.next_pending.set(pending.0 + 1);
         self.pending.borrow_mut().insert(pending, webview);
-        self.push(EngineEvent::NewTabRequested { opener, pending });
+        self.push(EngineEvent::NewTabRequested {
+            opener,
+            pending,
+            background: false,
+        });
+    }
+
+    /// Right-click on page content: Servo says what is under the pointer
+    /// (a link, an image, an editable field, a selection) and offers its
+    /// own actions; the shell shows osmena's menu and answers through
+    /// `TabHost::page_command`. Other controls (`<select>` pickers,
+    /// dialogs) are not handled yet and are dismissed by dropping them.
+    fn show_embedder_control(&self, webview: WebView, control: EmbedderControl) {
+        let EmbedderControl::ContextMenu(menu) = control else {
+            return;
+        };
+        let Some(tab) = self.tab(&webview) else {
+            return;
+        };
+        let info = menu.element_info();
+        let flags = info.flags;
+        let context = PageContext {
+            link: info.link_url.clone(),
+            media: info.image_url.clone().map(|src| Media {
+                kind: MediaKind::Image,
+                src,
+                looping: None,
+                controls: None,
+            }),
+            // Servo says text is selected but not what it is.
+            selection: flags
+                .contains(ContextMenuElementInformationFlags::Selection)
+                .then(String::new),
+            editable: flags
+                .contains(ContextMenuElementInformationFlags::EditableText)
+                .then_some(EditState::ALL),
+            misspelling: None,
+        };
+        self.context_menus.borrow_mut().insert(tab, menu);
+        self.push(EngineEvent::ContextMenuRequested {
+            tab,
+            position: None,
+            context,
+        });
+    }
+
+    fn hide_embedder_control(&self, _webview: WebView, id: EmbedderControlId) {
+        self.context_menus
+            .borrow_mut()
+            .retain(|_, menu| menu.id() != id);
     }
 
     fn show_console_message(&self, _webview: WebView, level: ConsoleLogLevel, message: String) {

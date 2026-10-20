@@ -17,6 +17,18 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Added
 
+- The page's context menu, from the shared chrome: a link opens in a
+  new tab (behind the current one, beside it) or a new window, or has
+  its address copied; an image opens in a new tab or has its address
+  copied; a text field or selection gets Cut, Copy, Paste, and Select
+  all (Servo's own); a plain page gets Back, Forward, and Reload. Servo
+  0.7.0 offers no saving, printing, source view, or developer tools, so
+  those entries are left out.
+- Address-bar text that is not a URL is searched, with Google by
+  default; the Search engine and Search URL fields in Settings (or
+  `[search]` in `settings.toml`, where `{query}` stands for the text)
+  change the provider. A command-line argument that is not a URL is
+  searched too.
 - Tab folders: "Move tab to folder…" in a tab's context menu (acting on
   the selection) names a folder ("Folder A", "Folder B", … by default,
   or an existing one) whose tabs sit behind one chip in the strip; the

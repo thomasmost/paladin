@@ -13,12 +13,13 @@ use std::sync::Arc;
 
 use dpi::PhysicalSize;
 use euclid::{Point2D, Scale, Size2D};
-use osmena_core::{EngineEvent, EngineInput, LoadState, PendingTab, TabId};
+use osmena_core::{EngineEvent, EngineInput, LoadState, PageCommand, PendingTab, TabId};
 use osmena_engine::{BlitFn, BlitRect, EngineError, PagePaint, Surface, TabHost as TabHostApi};
 use raw_window_handle::{DisplayHandle, WindowHandle};
 use servo::{
-    LoadStatus, OffscreenRenderingContext, RenderingContext, Servo, SoftwareRenderingContext,
-    WebView, WebViewBuilder, WindowRenderingContext,
+    ClipboardAction, ContextMenuAction, InputEvent, LoadStatus, OffscreenRenderingContext,
+    RenderingContext, Servo, SoftwareRenderingContext, WebView, WebViewBuilder,
+    WindowRenderingContext,
 };
 use url::Url;
 
@@ -314,6 +315,49 @@ impl TabHostApi for TabHost {
         self.with(tab, |w| {
             w.notify_input_event(to_servo(input));
         });
+    }
+
+    /// The editing commands go back to Servo as the answer to the context
+    /// menu it asked for (which knows the element), or as editing events
+    /// once the menu is gone; Servo 0.7.0 offers nothing else
+    /// (`INFO.page_tools` is `NONE`).
+    fn page_command(&self, tab: TabId, command: PageCommand) {
+        let Some(webview) = self.tabs.get(&tab) else {
+            log::warn!("no engine tab for {tab:?}");
+            return;
+        };
+        let menu = self.delegate.take_context_menu(tab);
+        let action = match command {
+            PageCommand::Cut => Some(ContextMenuAction::Cut),
+            PageCommand::Copy => Some(ContextMenuAction::Copy),
+            PageCommand::Paste => Some(ContextMenuAction::Paste),
+            PageCommand::SelectAll => Some(ContextMenuAction::SelectAll),
+            _ => None,
+        };
+        match (menu, action) {
+            (Some(menu), Some(action)) => menu.select(action),
+            (menu, _) => {
+                // Dropping the menu, if there was one, dismisses it.
+                drop(menu);
+                let clipboard = match command {
+                    PageCommand::Cut => Some(ClipboardAction::Cut),
+                    PageCommand::Copy => Some(ClipboardAction::Copy),
+                    PageCommand::Paste => Some(ClipboardAction::Paste),
+                    _ => None,
+                };
+                match clipboard {
+                    Some(action) => {
+                        webview.notify_input_event(InputEvent::EditingAction(action));
+                    }
+                    None => log::warn!("{command:?} is not available with Servo 0.7.0"),
+                }
+            }
+        }
+    }
+
+    fn context_menu_closed(&self, tab: TabId) {
+        // Dropping the menu Servo is waiting on dismisses it.
+        drop(self.delegate.take_context_menu(tab));
     }
 
     /// Paint the tab into the offscreen target and hand the shell the blit

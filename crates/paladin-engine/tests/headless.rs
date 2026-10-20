@@ -67,7 +67,9 @@ fn loads_a_data_url_headlessly() {
                     host.paint(t);
                     saw_frame = true;
                 }
-                EngineEvent::NewTabRequested { opener, pending } if opener == tab => {
+                EngineEvent::NewTabRequested {
+                    opener, pending, ..
+                } if opener == tab => {
                     assert!(popup_pending.is_none(), "page requested two popups");
                     popup_pending = Some(pending);
                     assert!(host.adopt_tab(pending, popup), "adopting the popup failed");

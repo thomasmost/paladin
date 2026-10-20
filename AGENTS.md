@@ -6,7 +6,7 @@ model, the egui chrome, and the winit application come from
 with Nautilus (Chromium). This repository holds only what is Servo's: the
 engine crate, the forks, and the binary that brands it.
 
-_Last updated: 2026-10-19 (handoff after the move onto osmena)._
+_Last updated: 2026-10-19 (the page context menu through Servo's embedder controls)._
 
 ## Architecture
 
@@ -60,6 +60,20 @@ Run from the repo root:
 
 - **Servo stays in `paladin-engine`.** The binary never names a Servo
   type; the shell sees only osmena's types.
+- **The page context menu is Servo's embedder control, answered by the
+  shell's menu.** `WebViewDelegate::show_embedder_control` hands the
+  delegate a `ContextMenu` on a right-click, with the element's link
+  and image URLs and its flags; the delegate keeps it in
+  `context_menus`, reports a `PageContext` as
+  `EngineEvent::ContextMenuRequested` (no position: the shell uses the
+  pointer), and `TabHost::page_command` answers it with Servo's own
+  `ContextMenuAction` for Cut, Copy, Paste, and Select all, or, once
+  the menu is gone, sends an `InputEvent::EditingAction`. Dropping the
+  `ContextMenu` dismisses it (`context_menu_closed`,
+  `hide_embedder_control`). Everything else in the menu is the model's;
+  `INFO.page_tools` is `NONE`, so no entry Servo cannot serve appears.
+  The other embedder controls (`<select>` pickers, dialogs) are still
+  dropped unanswered.
 - **Shared behaviour changes in osmena.** A change to the model, the
   chrome, routing, menus, or the settings window is an osmena change:
   patch the osmena checkout in `~/.cargo/config.toml` (osmena's README),
@@ -224,6 +238,14 @@ A task is complete only when:
   a Servo bump.
 
 ## Status and handoff (2026-10-19)
+
+Added 2026-10-20: the page context menu through Servo's `ContextMenu`
+embedder control (see Conventions) and osmena's address-bar search.
+Verified: `cargo build --workspace`, `cargo test --workspace` (the
+headless Servo tests included), clippy, formatting. Not verified: the
+menu by hand (whether Servo raises the control on a right-click in a
+Paladin window, and whether Cut, Copy, Paste, and Select all act), the
+search by hand.
 
 What changed today: `paladin-core` and the binary's app, window, chrome,
 menus, routing, settings window and process glue moved to osmena; the engine

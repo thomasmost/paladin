@@ -31,6 +31,11 @@ sibling; this repository holds what is Servo's.
 - **Tab folders and bookmark groups.** Fold a selection of tabs behind
   one chip in the strip, or bookmark it as a named group to reopen from
   the menu.
+- **A right-click menu.** Open a link in a new tab or window, copy a
+  link or image address, cut, copy, paste, or select all; what Servo
+  cannot do yet (save, print, inspect) is left out.
+- **Search from the address bar.** Text that is not a URL is searched,
+  with Google unless Settings names another engine.
 - **Keyboard first.** Every control is a command with Chromium's shortcut
   (Cmd for Ctrl on macOS), chords work even while the address bar has
   focus, and Settings remaps them the way a game's controls screen does:
@@ -183,6 +188,14 @@ or engine glue. Each item must pass.
    pointer back over the page: the selection does not keep growing. Press
    in the address bar, release over the page, then move over the page: the
    address bar's selection does not keep growing either.
+   **Page menu.** Right-click a link: a native menu at the pointer offers
+   Open link in new tab, Open link in new window, and Copy link address;
+   "Open link in new tab" adds a tab right after this one without
+   leaving it. Right-click a text field: Undo and Redo (disabled), Cut,
+   Copy, Paste, Delete (disabled), Select all. Right-click empty page:
+   Back, Forward, Reload with their shortcuts.
+   **Search.** Type `rust programming language` in the address bar and
+   press Enter: a Google search for it loads.
 8. **Exit.** Closing the window exits with no Servo error output on the
    terminal. Quitting from the Dock menu does the same.
 9. **Windows and menu.** Cmd+N (Ctrl+N on Windows), or New window chosen
@@ -299,7 +312,9 @@ Upstream causes and the features they block are tracked in
 - Textareas sized by their `rows` attribute are shorter than in other
   browsers (Servo uses rows × font size, not rows × line height), so one-row
   fields such as Google's search box cut off descenders.
-- No search engine: address-bar text that is not a URL is ignored.
+- The page menu has no Save, Print, View source, or Inspect (Servo 0.7.0
+  has no API for them), and Undo, Redo, and Delete in a field are
+  disabled.
 - Stop is disabled while a page loads (Servo 0.7.0 has no API for it).
 - Without the system title bar, Windows 11's snap-layouts flyout on the
   maximize control is not available (snap by dragging still is), and the
@@ -319,6 +334,5 @@ Upstream causes and the features they block are tracked in
 
 - [ ] Phase 2: remappable hotkeys, profiles, moving tabs between windows
 - [ ] Media playback (the `media-gstreamer` feature is off; no audio or video)
-- [ ] A search engine for address-bar text that is not a URL
 - [ ] IME composition for page text fields: forward Servo's input-method control to winit's `set_ime_allowed`; egui-winit only enables IME for its own fields
 - [ ] Restore previous windows on launch (the setting is stored but not acted on)
