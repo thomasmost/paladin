@@ -8,6 +8,9 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Changed
 
+- The tab strip fades from the chrome colour at its top into the
+  toolbar at its bottom edge instead of meeting it along a hard line
+  (osmena).
 - The model, the egui chrome, the settings window, and the winit
   application now come from the [osmena](https://github.com/thomasmost/osmena)
   crates, shared with Nautilus (Paladin's Chromium sibling). `paladin-core`

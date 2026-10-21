@@ -5162,7 +5162,7 @@ dependencies = [
 [[package]]
 name = "osmena-chrome"
 version = "0.1.0"
-source = "git+https://github.com/thomasmost/osmena?rev=b1d27c58a1f97df47e3cc1d567b5d198007d5519#b1d27c58a1f97df47e3cc1d567b5d198007d5519"
+source = "git+https://github.com/thomasmost/osmena?rev=de09e6be3a50dfaca9885afe2641796c40853c8d#de09e6be3a50dfaca9885afe2641796c40853c8d"
 dependencies = [
  "dpi",
  "egui",
@@ -5182,7 +5182,7 @@ dependencies = [
 [[package]]
 name = "osmena-core"
 version = "0.1.0"
-source = "git+https://github.com/thomasmost/osmena?rev=b1d27c58a1f97df47e3cc1d567b5d198007d5519#b1d27c58a1f97df47e3cc1d567b5d198007d5519"
+source = "git+https://github.com/thomasmost/osmena?rev=de09e6be3a50dfaca9885afe2641796c40853c8d#de09e6be3a50dfaca9885afe2641796c40853c8d"
 dependencies = [
  "directories",
  "keyboard-types",
@@ -5194,7 +5194,7 @@ dependencies = [
 [[package]]
 name = "osmena-engine"
 version = "0.1.0"
-source = "git+https://github.com/thomasmost/osmena?rev=b1d27c58a1f97df47e3cc1d567b5d198007d5519#b1d27c58a1f97df47e3cc1d567b5d198007d5519"
+source = "git+https://github.com/thomasmost/osmena?rev=de09e6be3a50dfaca9885afe2641796c40853c8d#de09e6be3a50dfaca9885afe2641796c40853c8d"
 dependencies = [
  "dpi",
  "glow",
@@ -5208,7 +5208,7 @@ dependencies = [
 [[package]]
 name = "osmena-shell"
 version = "0.1.0"
-source = "git+https://github.com/thomasmost/osmena?rev=b1d27c58a1f97df47e3cc1d567b5d198007d5519#b1d27c58a1f97df47e3cc1d567b5d198007d5519"
+source = "git+https://github.com/thomasmost/osmena?rev=de09e6be3a50dfaca9885afe2641796c40853c8d#de09e6be3a50dfaca9885afe2641796c40853c8d"
 dependencies = [
  "arboard",
  "clap",
@@ -5229,7 +5229,7 @@ dependencies = [
 [[package]]
 name = "osmena-xtask"
 version = "0.1.0"
-source = "git+https://github.com/thomasmost/osmena?rev=b1d27c58a1f97df47e3cc1d567b5d198007d5519#b1d27c58a1f97df47e3cc1d567b5d198007d5519"
+source = "git+https://github.com/thomasmost/osmena?rev=de09e6be3a50dfaca9885afe2641796c40853c8d#de09e6be3a50dfaca9885afe2641796c40853c8d"
 dependencies = [
  "icns",
  "ico",
