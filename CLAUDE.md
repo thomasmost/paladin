@@ -6,7 +6,8 @@ model, the egui chrome, and the winit application come from
 with Nautilus (Chromium). This repository holds only what is Servo's: the
 engine crate, the forks, and the binary that brands it.
 
-_Last updated: 2026-10-19 (the page context menu through Servo's embedder controls)._
+_Last updated: 2026-10-22 (osmena 0c4d71d: pointer modifiers, focus-loss
+releases)._
 
 ## Architecture
 
@@ -238,6 +239,14 @@ A task is complete only when:
   a Servo bump.
 
 ## Status and handoff (2026-10-19)
+
+Added 2026-10-22: osmena 0c4d71d. Its pointer events now carry the
+keyboard modifiers; Servo's mouse events have no field for them and
+Servo keeps its own modifier state from key events, so `input.rs`
+ignores them (the shell's release of held keys on focus loss keeps that
+state right). `FrameRef::dirty` does not concern the blit path.
+Verified: `cargo test --workspace -p paladin-engine` (the headless Servo
+tests included), formatting. Not verified: anything by hand.
 
 Added 2026-10-20: the page context menu through Servo's `ContextMenu`
 embedder control (see Conventions) and osmena's address-bar search.
