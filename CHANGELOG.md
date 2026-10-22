@@ -6,6 +6,21 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ## [Unreleased]
 
+### Added
+
+- The back and forward buttons of a mouse go back and forward in the
+  active tab (osmena).
+
+### Fixed
+
+- A key or mouse button held in a page when the window lost focus
+  (Alt+Tab) or when a keyboard tab switch happened mid-drag stayed down
+  in that page; the shell now releases it there (osmena).
+- The window redrew continuously while the address bar had focus
+  (osmena).
+- A folder's drop-down list stayed open after a click on the page
+  (osmena).
+
 ### Changed
 
 - Tabs in the strip are all one standard width instead of each taking

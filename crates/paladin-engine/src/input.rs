@@ -9,9 +9,14 @@ use servo::{
     MouseMoveEvent, WheelDelta, WheelEvent, WheelMode,
 };
 
+/// Servo's mouse events carry no modifiers: it keeps the modifier state
+/// from the key events it receives, so the `modifiers` the shell puts on
+/// each pointer event are not passed through. The shell releases held
+/// modifiers in the page when the window loses focus, which keeps
+/// Servo's own state right.
 pub(crate) fn to_servo(input: EngineInput) -> InputEvent {
     match input {
-        EngineInput::MouseMove { x, y } => {
+        EngineInput::MouseMove { x, y, .. } => {
             InputEvent::MouseMove(MouseMoveEvent::new(DevicePoint::new(x, y).into()))
         }
         EngineInput::MouseButton {
@@ -19,6 +24,7 @@ pub(crate) fn to_servo(input: EngineInput) -> InputEvent {
             button,
             x,
             y,
+            ..
         } => InputEvent::MouseButton(MouseButtonEvent::new(
             match action {
                 ButtonAction::Down => MouseButtonAction::Down,
@@ -35,7 +41,7 @@ pub(crate) fn to_servo(input: EngineInput) -> InputEvent {
             DevicePoint::new(x, y).into(),
         )),
         EngineInput::MouseLeft => InputEvent::MouseLeftViewport(MouseLeftViewportEvent::default()),
-        EngineInput::Wheel { dx, dy, x, y } => InputEvent::Wheel(WheelEvent::new(
+        EngineInput::Wheel { dx, dy, x, y, .. } => InputEvent::Wheel(WheelEvent::new(
             WheelDelta {
                 x: dx,
                 y: dy,
@@ -93,8 +99,11 @@ mod tests {
 
     #[test]
     fn mouse_move_carries_the_position() {
-        let InputEvent::MouseMove(event) = to_servo(EngineInput::MouseMove { x: 12.5, y: 40.0 })
-        else {
+        let InputEvent::MouseMove(event) = to_servo(EngineInput::MouseMove {
+            x: 12.5,
+            y: 40.0,
+            modifiers: Default::default(),
+        }) else {
             panic!("expected MouseMove");
         };
         assert_eq!(device_point(&event.point), (12.5, 40.0));
@@ -122,6 +131,7 @@ mod tests {
                     button,
                     x: 3.0,
                     y: 4.0,
+                    modifiers: Default::default(),
                 };
                 let InputEvent::MouseButton(event) = to_servo(input) else {
                     panic!("expected MouseButton");
@@ -148,6 +158,7 @@ mod tests {
             dy: 120.0,
             x: 5.0,
             y: 6.0,
+            modifiers: Default::default(),
         };
         let InputEvent::Wheel(event) = to_servo(input) else {
             panic!("expected Wheel");
