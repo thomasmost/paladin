@@ -8,6 +8,8 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Added
 
+- The Shell chrome colour, a warm sand, in the settings window
+  (osmena). Paladin's fresh profiles stay Slate.
 - On macOS, the menu bar: Paladin (About, Settings…, Services, Hide,
   Hide Others, Show All, Quit), File, Edit, View, History, Bookmarks,
   Profiles, Tab and Window, with the keymap's shortcuts. The Edit
