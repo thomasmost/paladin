@@ -8,6 +8,11 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Added
 
+- On macOS, the menu bar: Paladin (About, Settings…, Services, Hide,
+  Hide Others, Show All, Quit), File, Edit, View, History, Bookmarks,
+  Profiles, Tab and Window, with the keymap's shortcuts. The Edit
+  entries (Cmd+C and the rest) act on the page or on a focused text
+  field of the chrome (osmena).
 - A new tab (Ctrl+T, the "+" button) opens the launcher, a large field
   over the window, instead of a blank page: type an address or a
   search and press Enter, or pick a page from the history's matches;
@@ -21,6 +26,9 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Fixed
 
+- The new-tab launcher opened dimmed, its field under the grey
+  backdrop, once a launcher had been cancelled by a click outside it
+  (osmena).
 - A key or mouse button held in a page when the window lost focus
   (Alt+Tab) or when a keyboard tab switch happened mid-drag stayed down
   in that page; the shell now releases it there (osmena).

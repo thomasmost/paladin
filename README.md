@@ -319,9 +319,11 @@ Upstream causes and the features they block are tracked in
 - Without the system title bar, Windows 11's snap-layouts flyout on the
   maximize control is not available (snap by dragging still is), and the
   frameless window has not been tried on macOS.
-- No macOS application menu: winit's default menu is turned off so that
-  Cmd+Q reaches Paladin's own shortcut handling, which also removes Cmd+H
-  (hide) and Cmd+M (minimize). A custom menu is planned.
+- The macOS menu bar (osmena's: Paladin, File, Edit, View, History,
+  Bookmarks, Profiles, Tab, Window) has not yet been tried on a Mac by
+  hand. Its Edit entries reach the page as Servo's clipboard and
+  select-all actions, the way the page context menu's do; Undo and
+  Redo do nothing in a page.
 - Restore previous windows on launch is stored in `settings.toml` but not yet
   acted on.
 - No bookmarks, history UI, downloads UI, extensions, sync, or auto-update.
