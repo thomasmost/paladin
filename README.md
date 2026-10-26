@@ -21,10 +21,16 @@ sibling; this repository holds what is Servo's.
   for a new one, or right-click to close them all, move them to a window,
   or open them in another profile.
 - **Profiles.** Each profile has its own settings, cookies, and local
-  storage; `--profile <name>` picks one, and a tab can be handed to another
-  profile from its context menu.
-- **Your colour.** Settings offers a row of swatches that tint the tab strip
-  and toolbar per profile.
+  storage, and a name, a colour and an avatar. The avatar at the
+  toolbar's end opens the Profiles menu (also in the macOS menu bar):
+  Edit… customises the current profile, the other profiles open in a
+  window of their own, Add Profile… makes one (name it, pick its theme
+  colour and avatar, choose whether to share the default profile's
+  bookmarks; history is never shared), and Delete Profile removes
+  one. `--profile <dir>` picks one on the command line, and a tab can
+  be handed to another profile from its context menu.
+- **Your colour.** The profile dialog and the settings window offer a row
+  of swatches that tint the tab strip and toolbar per profile.
 - **Sleek by default.** No system title bar: the tab strip is the title
   bar, with the window controls at its end. "Use the system title bar and
   borders" in Settings brings the frame back.
@@ -319,6 +325,9 @@ Upstream causes and the features they block are tracked in
 - Without the system title bar, Windows 11's snap-layouts flyout on the
   maximize control is not available (snap by dragging still is), and the
   frameless window has not been tried on macOS.
+- The Profiles menu and dialog (osmena's, 2026-10-26) have not been
+  tried in Paladin by hand; the dialog offers no extension copying,
+  since Servo runs no extensions.
 - The macOS menu bar (osmena's: Paladin, File, Edit, View, History,
   Bookmarks, Profiles, Tab, Window) has not yet been tried on a Mac by
   hand. Its Edit entries reach the page as Servo's clipboard and

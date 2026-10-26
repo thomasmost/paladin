@@ -8,6 +8,12 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Added
 
+- Profiles can be named, coloured and given an avatar, and made and
+  deleted from the browser: the avatar at the toolbar's end opens the
+  Profiles menu (the macOS menu bar has the same), with Edit…, the other
+  profiles, Add Profile… and Delete Profile. A profile may share the
+  Default profile's bookmarks; history is never shared. The window
+  title names a non-default profile (osmena).
 - The Shell chrome colour, a warm sand, in the settings window
   (osmena). Paladin's fresh profiles stay Slate.
 - On macOS, the menu bar: Paladin (About, Settings…, Services, Hide,

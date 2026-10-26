@@ -6,8 +6,8 @@ model, the egui chrome, and the winit application come from
 with Nautilus (Chromium). This repository holds only what is Servo's: the
 engine crate, the forks, and the binary that brands it.
 
-_Last updated: 2026-10-22 (osmena 0c4d71d: pointer modifiers, focus-loss
-releases)._
+_Last updated: 2026-10-26 (osmena's profiles: name, colour, avatar, the
+Profiles menu and dialog; nothing engine-side changed)._
 
 ## Architecture
 
