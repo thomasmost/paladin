@@ -14,6 +14,9 @@ releases yet; `Unreleased` holds everything on `main`.
   profiles, Add Profile… and Delete Profile. A profile may share the
   Default profile's bookmarks; history is never shared. The window
   title names a non-default profile (osmena).
+- The profile dialog offers its avatars in two palettes: "Sea
+  creatures" (whale, spouting whale, dolphin, octopus, shell, fish,
+  tropical fish, blowfish, turtle, penguin) and "Assorted" (osmena).
 - The Shell chrome colour, a warm sand, in the settings window
   (osmena). Paladin's fresh profiles stay Slate.
 - On macOS, the menu bar: Paladin (About, Settings…, Services, Hide,

@@ -18,10 +18,10 @@ publish = false
 # glow to the versions Servo 0.7.0's own shell uses; they share a GL
 # context and raw window handles with Servo, so a Servo bump that moves
 # them is an osmena bump first (see CLAUDE.md).
-osmena-core = { git = "https://github.com/thomasmost/osmena", rev = "0306ab5f130af0fb400cd6c04373627c90d9d768" }
-osmena-engine = { git = "https://github.com/thomasmost/osmena", rev = "0306ab5f130af0fb400cd6c04373627c90d9d768" }
-osmena-shell = { git = "https://github.com/thomasmost/osmena", rev = "0306ab5f130af0fb400cd6c04373627c90d9d768" }
-osmena-xtask = { git = "https://github.com/thomasmost/osmena", rev = "0306ab5f130af0fb400cd6c04373627c90d9d768" }
+osmena-core = { git = "https://github.com/thomasmost/osmena", rev = "8a5e79d0f2138db4bfb2eec3bf0626d8e81e0f6d" }
+osmena-engine = { git = "https://github.com/thomasmost/osmena", rev = "8a5e79d0f2138db4bfb2eec3bf0626d8e81e0f6d" }
+osmena-shell = { git = "https://github.com/thomasmost/osmena", rev = "8a5e79d0f2138db4bfb2eec3bf0626d8e81e0f6d" }
+osmena-xtask = { git = "https://github.com/thomasmost/osmena", rev = "8a5e79d0f2138db4bfb2eec3bf0626d8e81e0f6d" }
 # Servo's own GL crates, at the versions it pins.
 glow = "=0.17.0"
 surfman = "=0.14.0"

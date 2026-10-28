@@ -25,8 +25,9 @@ sibling; this repository holds what is Servo's.
   toolbar's end opens the Profiles menu (also in the macOS menu bar):
   Edit… customises the current profile, the other profiles open in a
   window of their own, Add Profile… makes one (name it, pick its theme
-  colour and avatar, choose whether to share the default profile's
-  bookmarks; history is never shared), and Delete Profile removes
+  colour and an avatar from the sea-creature or the assorted palette,
+  choose whether to share the default profile's bookmarks; history is
+  never shared), and Delete Profile removes
   one. `--profile <dir>` picks one on the command line, and a tab can
   be handed to another profile from its context menu.
 - **Your colour.** The profile dialog and the settings window offer a row
