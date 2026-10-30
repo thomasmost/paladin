@@ -8,6 +8,10 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Added
 
+- Page zoom, from osmena, over Servo's page zoom: Ctrl and + or − (or the
+  wheel), Ctrl+0, the ☰ menu's Zoom submenu; every tab on the site
+  follows, the site remembers its level, a chip beside the address bar
+  shows it, and Settings sets the default.
 - The find bar's menu entries, from osmena, disabled: Servo 0.7.0 has
   no API to search a page (`docs/upstream-issues.md`, S13).
 - Bookmarks, from osmena: the star beside the address bar (Ctrl+D) with

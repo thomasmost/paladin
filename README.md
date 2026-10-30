@@ -35,6 +35,9 @@ sibling; this repository holds what is Servo's.
 - **Sleek by default.** No system title bar: the tab strip is the title
   bar, with the window controls at its end. "Use the system title bar and
   borders" in Settings brings the frame back.
+- **Page zoom.** Ctrl and + or − (or the wheel) zoom the page through
+  Chromium's steps; every tab on the site follows and the site remembers
+  its level; a chip beside the address bar shows it; Ctrl+0 resets.
 - **Bookmarks.** The star beside the address bar (or Ctrl+D) bookmarks
   the page and opens a popover to name it, pick its group, or remove it;
   the bookmarks bar (Ctrl+Shift+B) shows the "Bookmarks bar" group as

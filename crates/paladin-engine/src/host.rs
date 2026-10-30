@@ -355,6 +355,13 @@ impl TabHostApi for TabHost {
         }
     }
 
+    /// Servo's page zoom is a plain factor over the page's own size.
+    fn set_zoom(&self, tab: TabId, percent: u16) {
+        if let Some(webview) = self.tabs.get(&tab) {
+            webview.set_page_zoom(f32::from(percent) / 100.0);
+        }
+    }
+
     fn context_menu_closed(&self, tab: TabId) {
         // Dropping the menu Servo is waiting on dismisses it.
         drop(self.delegate.take_context_menu(tab));
