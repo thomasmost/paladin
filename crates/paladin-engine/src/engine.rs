@@ -23,6 +23,8 @@ pub static INFO: EngineInfo = EngineInfo {
     supports_stop: false,
     // Nor one to search a page for text (docs/upstream-issues.md, S13).
     find: false,
+    // Nor a download hook (S14).
+    downloads: false,
     // The value Servo's own shell uses per wheel line.
     wheel_line_px: 76.0,
     // Servo runs no browser extensions.

@@ -8,6 +8,8 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Added
 
+- The downloads button and entries, from osmena, left out and disabled:
+  Servo 0.7.0 has no download hook (`docs/upstream-issues.md`, S14).
 - Page zoom, from osmena, over Servo's page zoom: Ctrl and + or − (or the
   wheel), Ctrl+0, the ☰ menu's Zoom submenu; every tab on the site
   follows, the site remembers its level, a chip beside the address bar

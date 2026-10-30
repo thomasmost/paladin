@@ -230,6 +230,22 @@ or starts with the workaround noted in the entry.
   `EngineEvent::FindResult` from the delegate's notification, and set
   `find: true` in `engine.rs`; remove the README entry.
 
+### S14: No download hook
+
+- **Upstream:** no issue found. `WebViewDelegate` in servo 0.7.0 has no
+  notification for a response that should be saved rather than rendered
+  (`Content-Disposition: attachment`, an unknown type); the navigation is
+  dropped.
+- **Effect:** `EngineInfo::downloads` is false, so osmena leaves out the
+  downloads button and disables the entries, and the settings window
+  says the engine does not download.
+- **Blocks:** downloads (`docs/prd/03-downloads.md` in the parent
+  directory).
+- **When it lands:** the minimal route is a delegate hook that hands the
+  URL and headers to the embedder, which then fetches with `ureq` (the
+  updater's client) and reports `EngineEvent::DownloadUpdated`; set
+  `downloads: true` in `engine.rs` and remove the README entry.
+
 ## egui and winit
 
 None yet. The IME item looked like one; see Checked and not upstream.
