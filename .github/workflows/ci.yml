@@ -180,7 +180,10 @@ jobs:
           cd target/release
           arch=$(uname -m)
           ditto -c -k --keepParent Paladin.app "Paladin-macos-$arch.zip"
-          ditto -c -k --keepParent paladin.dSYM "Paladin-$arch.dSYM.zip"
+          # cargo leaves no dSYM beside the binary; make one from its
+          # line tables, as Nautilus's job does.
+          dsymutil paladin -o Paladin.dSYM
+          ditto -c -k --keepParent Paladin.dSYM "Paladin-$arch.dSYM.zip"
 
       # The symbol file (PDB on Windows, dSYM on macOS) from the release
       # profile's line tables is uploaded next to the installer so a crash in
