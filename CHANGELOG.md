@@ -8,6 +8,10 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Added
 
+- Session restore, from osmena: "Continue where you left off" in
+  Settings brings the windows and tabs back where they were, loading
+  each tab when first shown; a crash leaves an offer to restore the
+  last session; "Restart to update" restores it too.
 - The downloads button and entries, from osmena, left out and disabled:
   Servo 0.7.0 has no download hook (`docs/upstream-issues.md`, S14).
 - Page zoom, from osmena, over Servo's page zoom: Ctrl and + or − (or the
