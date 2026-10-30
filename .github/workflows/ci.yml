@@ -225,12 +225,24 @@ jobs:
           version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
           tag="build-${{ github.run_number }}"
           release_url="${{ github.server_url }}/${{ github.repository }}/releases/tag/$tag"
-          setup=$(ls artifacts/paladin-windows-2025/*-setup.exe)
+          # An artifact keeps the files' paths below their common parent,
+          # which may nest them: find every asset by name.
+          find artifacts -type f | sort
+          asset() { find artifacts -type f -name "$1" | head -1; }
           bash ci/update-manifest.sh "$version" "${{ github.run_number }}" "${{ github.sha }}" "$release_url" latest.toml \
-            "windows-x86_64=$setup" \
-            macos-aarch64=artifacts/paladin-macos-15/Paladin-macos-arm64.zip
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+            "windows-x86_64=$(asset '*-setup.exe')" \
+            "macos-aarch64=$(asset Paladin-macos-arm64.zip)"
+          {
+            echo "tag=$tag"
+            echo "version=$version"
+            echo "files<<EOF"
+            asset '*-setup.exe'
+            asset paladin.pdb
+            asset '*.dmg'
+            asset Paladin-macos-arm64.zip
+            asset Paladin-arm64.dSYM.zip
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
       - name: Release
         shell: bash
         env:
@@ -241,12 +253,8 @@ jobs:
             echo "replacing the release of an earlier attempt of this run"
             gh release delete "$tag" --yes --cleanup-tag
           fi
+          readarray -t files <<< "${{ steps.manifest.outputs.files }}"
           gh release create "$tag" \
             --title "Paladin ${{ steps.manifest.outputs.version }} (build ${{ github.run_number }})" \
             --generate-notes --latest \
-            latest.toml \
-            artifacts/paladin-windows-2025/*-setup.exe \
-            artifacts/paladin-windows-2025/paladin.pdb \
-            artifacts/paladin-macos-15/*.dmg \
-            artifacts/paladin-macos-15/Paladin-macos-arm64.zip \
-            artifacts/paladin-macos-15/Paladin-arm64.dSYM.zip
+            latest.toml "${files[@]}"
