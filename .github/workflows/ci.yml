@@ -226,7 +226,7 @@ jobs:
           tag="build-${{ github.run_number }}"
           release_url="${{ github.server_url }}/${{ github.repository }}/releases/tag/$tag"
           setup=$(ls artifacts/paladin-windows-2025/*-setup.exe)
-          ci/update-manifest.sh "$version" "${{ github.run_number }}" "${{ github.sha }}" "$release_url" latest.toml \
+          bash ci/update-manifest.sh "$version" "${{ github.run_number }}" "${{ github.sha }}" "$release_url" latest.toml \
             "windows-x86_64=$setup" \
             macos-aarch64=artifacts/paladin-macos-15/Paladin-macos-arm64.zip
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
