@@ -215,6 +215,21 @@ or starts with the workaround noted in the entry.
 - **Blocks:** in-process profiles, as an alternative route to resolving
   [S7](#s7-no-profile-concept-site-data-is-per-process).
 
+### S13: No find in page
+
+- **Upstream:** no issue found. `WebView` in servo 0.7.0 has no method to
+  search the page's text or to highlight and step through matches; the
+  script thread has no find-in-page support to expose.
+- **Effect:** `EngineInfo::find` is false, so osmena disables "Find in
+  page…", the Edit menu's Find entries and drops the `Ctrl+F` chord;
+  Nautilus has the bar over Chromium's find.
+- **Blocks:** find in page (`docs/prd/01-find-in-page.md` in the parent
+  directory).
+- **When it lands:** implement `TabHost::find` and `stop_finding` in
+  `paladin-engine/src/host.rs` over the new API, report
+  `EngineEvent::FindResult` from the delegate's notification, and set
+  `find: true` in `engine.rs`; remove the README entry.
+
 ## egui and winit
 
 None yet. The IME item looked like one; see Checked and not upstream.

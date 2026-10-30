@@ -8,6 +8,8 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Added
 
+- The find bar's menu entries, from osmena, disabled: Servo 0.7.0 has
+  no API to search a page (`docs/upstream-issues.md`, S13).
 - Bookmarks, from osmena: the star beside the address bar (Ctrl+D) with
   its popover to name a bookmark, move it between groups or remove it;
   the bookmarks bar (Ctrl+Shift+B, or Settings) with favicon chips that

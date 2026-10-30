@@ -369,6 +369,8 @@ Upstream causes and the features they block are tracked in
   has no API for them), and Undo, Redo, and Delete in a field are
   disabled.
 - Stop is disabled while a page loads (Servo 0.7.0 has no API for it).
+- No find in page: the bar's entries are disabled and Ctrl+F does
+  nothing (Servo 0.7.0 has no API to search a page; S13).
 - Without the system title bar, Windows 11's snap-layouts flyout on the
   maximize control is not available (snap by dragging still is), and the
   frameless window has not been tried on macOS.

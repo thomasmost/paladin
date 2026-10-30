@@ -21,6 +21,8 @@ pub static INFO: EngineInfo = EngineInfo {
     data_dir: "servo",
     // Servo 0.7.0 has no API to stop a load.
     supports_stop: false,
+    // Nor one to search a page for text (docs/upstream-issues.md, S13).
+    find: false,
     // The value Servo's own shell uses per wheel line.
     wheel_line_px: 76.0,
     // Servo runs no browser extensions.
