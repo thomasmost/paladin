@@ -288,12 +288,40 @@ on macOS, `paladin_<version>_x64-setup.exe` (NSIS, per-user install) on
 Windows. The bundles are unsigned. CI builds both on every push to `main` and
 uploads them as workflow artifacts named `paladin-macos-15` and
 `paladin-windows-2025`, together with the symbol file for that build
-(`paladin.pdb` on Windows, `paladin.dSYM` on macOS; the release profile keeps
+(`paladin.pdb` on Windows, `Paladin-arm64.dSYM.zip` on macOS; the release profile keeps
 line tables). Release builds on Windows are GUI-subsystem apps with no console
 window, so they print no logs; debug builds keep the console. A release
 build still writes its log to a redirected stderr, and a crash can be
 caught with `cdb -g -G paladin.exe <url>` (set `_NO_DEBUG_HEAP=1` first) and
 symbolized with the PDB of the same build.
+
+### Releases and updates
+
+Every green push to `main` also becomes a GitHub release
+(<https://github.com/thomasmost/paladin/releases>), tagged `build-<run
+number>` and titled "Paladin <version> (build <run number>)", made by
+the workflow's `release` job from the package job's artifacts: the
+Windows installer, the macOS `.dmg` and a zip of the bundle (the update's form), the symbol files, and `latest.toml`, the
+update manifest (`ci/update-manifest.sh` writes it; the format is
+osmena-core's `update::Manifest`). GitHub's
+`releases/latest/download/latest.toml` always points at the newest
+release, and that is the URL in `crates/paladin/src/brand.rs`.
+
+The browser updates itself from it (osmena's flow, see its README): the
+package job sets `OSMENA_BUILD_NUMBER` to the run number, which the
+brand reads at compile time, so a running build knows whether a release
+is newer. It checks 15 seconds after it starts and every six hours,
+downloads the newer build into `<config dir>/Paladin/updates/`,
+verifies it, and shows a green "Restart to update" pill in the toolbar
+(also "Restart to update Paladin" in the ☰ menu and the application
+menu on macOS, and in Settings, whose Updates section has the
+"Check for updates and download them in the background" switch, "Check
+now" and the release notes). The restart runs the installer silently
+on Windows (it closes every other Paladin window, other profiles
+included, and installs over the previous location) or swaps the bundle
+on macOS, and starts the same profile again. A build made outside CI
+has no build number and never updates itself; "Check for updates…" is
+disabled in it. A rerun of a workflow run replaces that run's release.
 
 ### Windows prerequisites
 
@@ -336,7 +364,7 @@ Upstream causes and the features they block are tracked in
   Redo do nothing in a page.
 - Restore previous windows on launch is stored in `settings.toml` but not yet
   acted on.
-- No bookmarks, history UI, downloads UI, extensions, sync, or auto-update.
+- No history UI, downloads UI, extensions, or sync.
 - The Windows installer does not bundle the Microsoft Visual C++
   Redistributable that MSVC builds need. Install the x64 redistributable
   first from https://aka.ms/vs/17/release/vc_redist.x64.exe, or the app may

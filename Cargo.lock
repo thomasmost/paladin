@@ -5162,7 +5162,7 @@ dependencies = [
 [[package]]
 name = "osmena-chrome"
 version = "0.1.0"
-source = "git+https://github.com/thomasmost/osmena?rev=65fe67af024fb65979a76ae997f352ea55574a37#65fe67af024fb65979a76ae997f352ea55574a37"
+source = "git+https://github.com/thomasmost/osmena?rev=7866b29a3fd470066801ceb3fac7afaa6e3af8dc#7866b29a3fd470066801ceb3fac7afaa6e3af8dc"
 dependencies = [
  "dpi",
  "egui",
@@ -5182,7 +5182,7 @@ dependencies = [
 [[package]]
 name = "osmena-core"
 version = "0.1.0"
-source = "git+https://github.com/thomasmost/osmena?rev=65fe67af024fb65979a76ae997f352ea55574a37#65fe67af024fb65979a76ae997f352ea55574a37"
+source = "git+https://github.com/thomasmost/osmena?rev=7866b29a3fd470066801ceb3fac7afaa6e3af8dc#7866b29a3fd470066801ceb3fac7afaa6e3af8dc"
 dependencies = [
  "directories",
  "keyboard-types",
@@ -5194,7 +5194,7 @@ dependencies = [
 [[package]]
 name = "osmena-engine"
 version = "0.1.0"
-source = "git+https://github.com/thomasmost/osmena?rev=65fe67af024fb65979a76ae997f352ea55574a37#65fe67af024fb65979a76ae997f352ea55574a37"
+source = "git+https://github.com/thomasmost/osmena?rev=7866b29a3fd470066801ceb3fac7afaa6e3af8dc#7866b29a3fd470066801ceb3fac7afaa6e3af8dc"
 dependencies = [
  "dpi",
  "glow",
@@ -5208,7 +5208,7 @@ dependencies = [
 [[package]]
 name = "osmena-shell"
 version = "0.1.0"
-source = "git+https://github.com/thomasmost/osmena?rev=65fe67af024fb65979a76ae997f352ea55574a37#65fe67af024fb65979a76ae997f352ea55574a37"
+source = "git+https://github.com/thomasmost/osmena?rev=7866b29a3fd470066801ceb3fac7afaa6e3af8dc#7866b29a3fd470066801ceb3fac7afaa6e3af8dc"
 dependencies = [
  "arboard",
  "clap",
@@ -5223,6 +5223,8 @@ dependencies = [
  "osmena-chrome",
  "osmena-core",
  "osmena-engine",
+ "sha2 0.10.9",
+ "ureq",
  "url",
  "windows-sys 0.61.2",
  "winit",
@@ -5231,7 +5233,7 @@ dependencies = [
 [[package]]
 name = "osmena-xtask"
 version = "0.1.0"
-source = "git+https://github.com/thomasmost/osmena?rev=65fe67af024fb65979a76ae997f352ea55574a37#65fe67af024fb65979a76ae997f352ea55574a37"
+source = "git+https://github.com/thomasmost/osmena?rev=7866b29a3fd470066801ceb3fac7afaa6e3af8dc#7866b29a3fd470066801ceb3fac7afaa6e3af8dc"
 dependencies = [
  "icns",
  "ico",
@@ -6318,6 +6320,7 @@ dependencies = [
  "aws-lc-rs",
  "log",
  "once_cell",
+ "ring",
  "rustls-pki-types",
  "rustls-webpki",
  "subtle",
@@ -9539,6 +9542,35 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
+name = "ureq"
+version = "3.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a7ac20be9b7726e0bbdbf974c059676d9acb1cd414961f570a4e8231cacd7fc"
+dependencies = [
+ "base64 0.23.1",
+ "log",
+ "percent-encoding",
+ "rustls",
+ "rustls-pki-types",
+ "rustls-platform-verifier",
+ "ureq-proto",
+ "utf8-zero",
+ "webpki-roots",
+]
+
+[[package]]
+name = "ureq-proto"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "841583fc36089d7d59419568ae157f43a5a03a2e5a81ba87c77d1596ef46e922"
+dependencies = [
+ "base64 0.23.1",
+ "http",
+ "httparse",
+ "log",
+]
+
+[[package]]
 name = "url"
 version = "2.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9596,6 +9628,12 @@ name = "utf16_iter"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8232dd3cdaed5356e0f716d285e4b40b932ac434100fe9b7e0e8e935b9e6246"
+
+[[package]]
+name = "utf8-zero"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8c0a043c9540bae7c578c88f91dda8bd82e59ae27c21baca69c8b191aaf5a6e"
 
 [[package]]
 name = "utf8_iter"
@@ -11100,3 +11138,8 @@ checksum = "27bc9d5b815bc103f142aa054f561d9187d191692ec7c2d1e2b4737f8dbd7296"
 dependencies = [
  "zune-core",
 ]
+
+
+
+
+

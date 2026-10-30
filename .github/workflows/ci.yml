@@ -121,6 +121,11 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-15, windows-2025]
+    env:
+      # The build number the browser compares with the release manifest
+      # (`Brand::build`, read at compile time); the release job tags the
+      # release with the same number.
+      OSMENA_BUILD_NUMBER: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@master
@@ -166,6 +171,17 @@ jobs:
       # executable bits in a zipped artifact, and the .dmg contains it.
       - run: cargo packager --release -p paladin
 
+      # The update check installs from a zip of the bundle (ditto keeps
+      # the executable bits and the signature); the zip carries the
+      # architecture like Nautilus's. The dSYM is zipped the same way.
+      - if: runner.os == 'macOS'
+        name: Zip the bundle
+        run: |
+          cd target/release
+          arch=$(uname -m)
+          ditto -c -k --keepParent Paladin.app "Paladin-macos-$arch.zip"
+          ditto -c -k --keepParent paladin.dSYM "Paladin-$arch.dSYM.zip"
+
       # The symbol file (PDB on Windows, dSYM on macOS) from the release
       # profile's line tables is uploaded next to the installer so a crash in
       # an installed build can be symbolized (the wikipedia.org crash in
@@ -175,7 +191,62 @@ jobs:
           name: paladin-${{ matrix.os }}
           path: |
             target/release/*.dmg
+            target/release/Paladin-macos-*.zip
+            target/release/Paladin-*.dSYM.zip
             target/release/*-setup.exe
             target/release/paladin.pdb
-            target/release/paladin.dSYM
           if-no-files-found: error
+
+  # Every green push to main is a GitHub release, tagged by the run
+  # number, carrying the installers and bundles the package job built,
+  # their symbols, and `latest.toml`: the manifest the browser's update
+  # check fetches at `releases/latest/download/latest.toml` (osmena's
+  # `update::Manifest`; ci/update-manifest.sh writes it). The build
+  # number inside the browser is the same run number (OSMENA_BUILD_NUMBER
+  # in the package job), which is how a running build knows a release is
+  # newer. A rerun of a run replaces its release.
+  release:
+    name: release
+    needs: package
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+      - name: Manifest
+        id: manifest
+        shell: bash
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          tag="build-${{ github.run_number }}"
+          release_url="${{ github.server_url }}/${{ github.repository }}/releases/tag/$tag"
+          setup=$(ls artifacts/paladin-windows-2025/*-setup.exe)
+          ci/update-manifest.sh "$version" "${{ github.run_number }}" "${{ github.sha }}" "$release_url" latest.toml \
+            "windows-x86_64=$setup" \
+            macos-aarch64=artifacts/paladin-macos-15/Paladin-macos-arm64.zip
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ steps.manifest.outputs.tag }}"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            echo "replacing the release of an earlier attempt of this run"
+            gh release delete "$tag" --yes --cleanup-tag
+          fi
+          gh release create "$tag" \
+            --title "Paladin ${{ steps.manifest.outputs.version }} (build ${{ github.run_number }})" \
+            --generate-notes --latest \
+            latest.toml \
+            artifacts/paladin-windows-2025/*-setup.exe \
+            artifacts/paladin-windows-2025/paladin.pdb \
+            artifacts/paladin-macos-15/*.dmg \
+            artifacts/paladin-macos-15/Paladin-macos-arm64.zip \
+            artifacts/paladin-macos-15/Paladin-arm64.dSYM.zip

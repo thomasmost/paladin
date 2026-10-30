@@ -6,8 +6,9 @@ model, the egui chrome, and the winit application come from
 with Nautilus (Chromium). This repository holds only what is Servo's: the
 engine crate, the forks, and the binary that brands it.
 
-_Last updated: 2026-10-26 (osmena's profiles: name, colour, avatar, the
-Profiles menu and dialog; nothing engine-side changed)._
+_Last updated: 2026-10-29 (updates over the air: the release job, the
+build number, and osmena's check, download and restart; before that
+osmena's profiles)._
 
 ## Architecture
 
@@ -204,6 +205,19 @@ Run from the repo root:
   (0.11.8 fails on formats the host can't build); the per-host default is
   app+dmg on macOS, NSIS on Windows. The `target/release/*.dll` resources glob
   assumes the default target dir and no `--target`.
+- **Every green push to `main` is a release, and the browser updates
+  from it.** The `release` job tags `build-<run number>`, attaches the
+  package job's artifacts (on macOS also `Paladin-macos-<arch>.zip`, a
+  `ditto` zip of the bundle, which is what the update installs) and
+  `latest.toml` (`ci/update-manifest.sh`, osmena's `update::Manifest`),
+  and the package job builds with `OSMENA_BUILD_NUMBER` set to the same
+  run number, which `brand.rs` reads with `option_env!` into
+  `Brand::build`. The check, download and restart are osmena's
+  (`osmena_shell::update`); this repository owns only the brand's
+  manifest URL (`releases/latest/download/latest.toml`) and the release
+  job. The installer's silent mode (`/S`) kills every `paladin.exe`,
+  so the restart closes other profiles' windows too. Keep the asset
+  names the release job lists in step with the package job's uploads.
 - **Generated icons are committed.** Replace `assets/logo.png` (the
   artwork) or edit `assets/logo.svg` (the tile that frames it; no `<text>`,
   osmena's xtask builds resvg without font support), run `cargo xtask
@@ -239,6 +253,12 @@ A task is complete only when:
   a Servo bump.
 
 ## Status and handoff (2026-10-19)
+
+Added 2026-10-29: updates over the air (see Conventions and osmena's
+handoff; the flow was exercised in Nautilus on Windows with a local
+manifest server, not in Paladin). Not verified: Paladin's release job
+before its first run, the real installer in silent mode over the
+installed copy, and macOS (the bundle zip and the swap).
 
 Added 2026-10-22: osmena 0c4d71d. Its pointer events now carry the
 keyboard modifiers; Servo's mouse events have no field for them and
