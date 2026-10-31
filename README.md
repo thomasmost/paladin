@@ -10,6 +10,19 @@ sibling; this repository holds what is Servo's.
 
 ## Features
 
+- **The Launch Panel.** Ctrl+T (Cmd+T on macOS) and "+" open a panel
+  over the window instead of a blank tab: a search-or-address field
+  with the history and bookmark matches dropping down under it, and
+  tiles beneath: the Google Drive files you opened last (after
+  "Connect Google Drive"; only in builds made with a Google client id,
+  see Local development), today's weather at a place you name on the
+  tile, Ask Claude and Ask ChatGPT fields that open the question in a
+  new tab, and the five sites you visit most. The gear opens the
+  Launch Settings in the panel: the search engine (Google, DuckDuckGo,
+  Bing, Brave, Kagi or custom), the question templates, the weather
+  place and units, the Google account, and the tiles themselves,
+  dragged to reorder or closed to remove. All of it is osmena's; the
+  Google client id is this build's.
 - **Servo under the hood.** Pages render through Servo, the Rust browser
   engine, not Chromium or WebKit. The chrome is drawn with egui; menus are
   the system's own popup menus.
@@ -95,6 +108,12 @@ docs/
 ```
 
 ## Local development
+
+The Launch Panel's Drive tile needs a Google OAuth client id at build
+time: set `PALADIN_GOOGLE_CLIENT_ID` in the environment to the id of a Google Cloud
+"Desktop app" client (it is not a secret) and build; CI reads the
+repository variable of the same name. Without it the build has no
+Drive tile and nothing else changes.
 
 Prerequisites: a Rust toolchain via `rustup` (the pinned version installs on
 first `cargo` run), Python 3.11 or newer on `PATH`, and a C/C++ toolchain:
