@@ -173,8 +173,9 @@ or engine glue. Each item must pass.
 
 1. **Launch.** A window opens with one tab at the homepage and the page
    renders. There is no system title bar: on Windows the tab strip ends
-   in the ☰ menu and the minimize, maximize, and close controls, and the
-   taskbar shows the Paladin logo with the title Paladin; on macOS the
+   in the minimize, maximize, and close controls, the toolbar in the
+   profile avatar and the ☰ menu, and the taskbar shows the Paladin logo
+   with the title Paladin; on macOS the
    traffic lights sit at the strip's left end and the Dock shows the
    logo. Dragging the strip's empty space moves the window,
    double-clicking it maximizes (zooms), and on Windows the pointer
