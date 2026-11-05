@@ -35,14 +35,17 @@ sibling; this repository holds what is Servo's.
   or open them in another profile.
 - **Profiles.** Each profile has its own settings, cookies, and local
   storage, and a name, a colour and an avatar. The avatar at the
-  toolbar's end opens the Profiles menu (also in the macOS menu bar):
-  Edit… customises the current profile, the other profiles open in a
-  window of their own, Add Profile… makes one (name it, pick its theme
-  colour and an avatar from the sea-creature or the assorted palette,
-  choose whether to share the default profile's bookmarks; history is
-  never shared), and Delete Profile removes
-  one. `--profile <dir>` picks one on the command line, and a tab can
-  be handed to another profile from its context menu.
+  toolbar's end opens the Profiles menu (also in the macOS menu bar),
+  shaped like Chromium's: Edit… customises the current profile, the
+  other profiles sit under "Other Paladin Profiles" and open in a
+  window of their own, Add Paladin Profile… makes one (name it, pick
+  its theme colour and an avatar from the sea-creature or the assorted
+  palette, choose whether to share the default profile's bookmarks;
+  history is never shared), Open Guest Profile starts a throwaway
+  "Guest" browser whose profile is deleted when it closes, and Manage
+  Profiles… lists every profile to open, edit or delete. `--profile
+  <dir>` picks one on the command line, and a tab can be handed to
+  another profile from its context menu.
 - **Your colour.** The profile dialog and the settings window offer a row
   of swatches that tint the tab strip and toolbar per profile.
 - **Sleek by default.** No system title bar: the tab strip is the title

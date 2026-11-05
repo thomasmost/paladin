@@ -8,6 +8,13 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Added
 
+- Guest profiles and the Manage Profiles dialog, from osmena: the
+  Profiles menu behind the avatar now reads like Chromium's (the
+  current profile and Edit…, "Other Paladin Profiles" over the rest,
+  then Add Paladin Profile…, Open Guest Profile and Manage Profiles…).
+  A guest is a throwaway profile deleted when its window closes;
+  Manage Profiles… opens, edits or deletes any profile from one
+  dialog, which is where Delete moved from the menu.
 - The Launch Panel, from osmena: Ctrl+T opens a wide panel with the
   search-or-address field on top and tiles under it: recent Google
   Drive files (after "Connect Google Drive", in builds made with a
