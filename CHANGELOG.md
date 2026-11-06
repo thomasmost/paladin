@@ -6,6 +6,14 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ## [Unreleased]
 
+### Fixed
+
+- Tab titles sat a pixel or two above the centre line of their
+  favicon since they were made smaller: they were centred by a band
+  that counted descenders in, which few letters have. They are centred
+  by their capitals now, descenders hanging below as on a page
+  (osmena).
+
 ### Changed
 
 - Tab titles and folder names are a notch smaller, and sit on the
@@ -20,6 +28,14 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Added
 
+- Restored tabs show their favicons and fresh titles without being
+  opened: after "Continue where you left off" brings a session back,
+  the tabs that wait for a click are loaded out of sight one after
+  another, half a second apart from left to right, each let go again
+  once its title and favicon are in. A tab clicked before its turn
+  loads as before; one clicked during its turn is simply shown. The
+  loads count for nothing in the history. Until its turn, a restored
+  tab shows the icon last seen for its site (osmena).
 - With nobody having chosen units, the weather tile measures the way
   the country it is showing does: a device that turns out to be in the
   United States reads Fahrenheit without anyone saying so, and a place

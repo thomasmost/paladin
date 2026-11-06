@@ -53,9 +53,10 @@ sibling; this repository holds what is Servo's.
   bar, with the window controls at its end. "Use the system title bar and
   borders" in Settings brings the frame back.
 - **Session restore.** "Continue where you left off" brings the windows
-  and tabs back where they were (tabs load when first shown); after a
-  crash a bar offers the last session; the update's restart restores
-  it too.
+  and tabs back where they were (tabs load when first shown, after a
+  look at each in turn, half a second apart, for its title and
+  favicon); after a crash a bar offers the last session; the update's
+  restart restores it too.
 - **Page zoom.** Ctrl and + or − (or the wheel) zoom the page through
   Chromium's steps; every tab on the site follows and the site remembers
   its level; a chip beside the address bar shows it; Ctrl+0 resets.
