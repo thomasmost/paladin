@@ -18,6 +18,10 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Added
 
+- Fahrenheit and Celsius are a row of their own in the Launch
+  Settings, labelled "Temperature" and named in words, where they were
+  two bare degree signs under the weather place (osmena).
+
 - The Launch Panel's weather tile follows this device: opening the
   panel asks the system where it is, which is what asks you for
   permission, and shows today's conditions there. Naming a place on
@@ -105,6 +109,11 @@ releases yet; `Unreleased` holds everything on `main`.
   active tab (osmena).
 
 ### Fixed
+
+- A fresh profile on Windows always showed the weather in Celsius,
+  wherever it was: the units follow the system's locale, and osmena
+  looked for it only where POSIX keeps it. The locale comes from the
+  system now (osmena).
 
 - The Launch Settings gear read as a steering wheel; it is a cog now.
   The weather tile's cloud had a dark bow tie across its middle, and
