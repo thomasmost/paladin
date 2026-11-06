@@ -18,6 +18,14 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Added
 
+- The Launch Panel's weather tile follows this device: opening the
+  panel asks the system where it is, which is what asks you for
+  permission, and shows today's conditions there. Naming a place on
+  the tile still overrides it and asks the system nothing, and the
+  Launch Settings move between the two. If the system will not say,
+  the tile says so and offers to look a place up instead. Windows
+  answers through its own location service; macOS cannot yet, so the
+  tile asks for a place name there (osmena).
 - Guest profiles and the Manage Profiles dialog, from osmena: the
   Profiles menu behind the avatar now reads like Chromium's (the
   current profile and Edit…, "Other Paladin Profiles" over the rest,
@@ -98,6 +106,10 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Fixed
 
+- The Launch Settings gear read as a steering wheel; it is a cog now.
+  The weather tile's cloud had a dark bow tie across its middle, and
+  its high and low read "H 20° L 14° °C" with the unit left dangling
+  (osmena).
 - The new-tab launcher opened dimmed, its field under the grey
   backdrop, once a launcher had been cancelled by a click outside it
   (osmena).
