@@ -6,10 +6,14 @@ model, the egui chrome, and the winit application come from
 with Nautilus (Chromium). This repository holds only what is Servo's: the
 engine crate, the forks, and the binary that brands it.
 
-_Last updated: 2026-11-06 (osmena's restored tabs warmed one by one
-for their titles and favicons; before that osmena's session restore; `EngineInfo::downloads` is false, S14; page zoom over Servo's page zoom; `EngineInfo::find` is false: no find in
-page until Servo has an API, S13; osmena's bookmarks: the star, the bar,
-the menu with import and export; before that updates over the air)._
+_Last updated: 2026-11-08 (blocked sites over Servo's navigation hook
+(osmena's list and block page; frames too, S15); before that osmena's
+restored tabs warmed one by one for their titles and favicons; before
+that osmena's session restore; `EngineInfo::downloads` is false, S14;
+page zoom over Servo's page zoom; `EngineInfo::find` is false: no find
+in page until Servo has an API, S13; osmena's bookmarks: the star, the
+bar, the menu with import and export; before that updates over the
+air)._
 
 ## Architecture
 
@@ -77,6 +81,17 @@ Run from the repo root:
   `INFO.page_tools` is `NONE`, so no entry Servo cannot serve appears.
   The other embedder controls (`<select>` pickers, dialogs) are still
   dropped unanswered.
+- **Blocked sites are denied in `request_navigation` and blanked through
+  `location.replace`.** `request_navigation` denies a navigation to a
+  site the profile blocks (`blocked_navigation`, over the list that
+  `configure_blocked_sites` sets in `DelegateState`) before any request,
+  and pushes `EngineEvent::NavigationBlocked`. Servo does not name the
+  frame, so an `<iframe>` is denied too (S15). `replace_with_blank`
+  swaps a blocked tab's entry for `about:blank` with
+  `location.replace`, so the block page does not stay behind Back; a
+  failed evaluation is logged. The loads this hook does not see (a
+  redirect, `WebView::load`, Back, Forward) rely on osmena's model guard
+  and its `UrlChanged` rule.
 - **Shared behaviour changes in osmena.** A change to the model, the
   chrome, routing, menus, or the settings window is an osmena change:
   patch the osmena checkout in `~/.cargo/config.toml` (osmena's README),
@@ -254,6 +269,36 @@ A task is complete only when:
   a Servo bump.
 
 ## Status and handoff (2026-10-19)
+
+Added 2026-11-08: blocked sites over Servo's navigation hook (see
+Conventions and osmena's handoff). `request_navigation` denies a
+navigation to a blocked site before any request and pushes
+`EngineEvent::NavigationBlocked`, through the pure `blocked_navigation`;
+the list lives in `DelegateState`, set by `configure_blocked_sites`; a
+blocked tab's entry is swapped for `about:blank` by `replace_with_blank`,
+which evaluates `location.replace('about:blank')`. Servo's hook fires
+only for script-initiated loads and `WebView::reload`: embedder loads
+(`WebView::load`), a new WebView's first URL, Back, Forward and HTTP
+redirects bypass it, so those paths rely on osmena's model guard and
+`UrlChanged` rule (S15). Verified: `cargo fmt --all --check`, clippy with
+`-D warnings`, `cargo build --workspace --all-targets`, and
+`cargo test --workspace` on Windows after the ANGLE DLLs (paladin-engine
+18 passed, the two new `blocked_navigation` tests among them; `headless`
+and `web_animations` passed). By hand, a debug build on Windows with
+scripted input: on example.com, "Block on this profile" and Block gave
+the block page with the address bar still `https://example.com/`, and no
+`blocked navigation` line for that; Remove in the settings window
+brought the page back and emptied `blocked.toml`; on a local `file://`
+page with a link to example.com, blocking example.com and clicking the
+link gave the block page and `blocked navigation to https://example.com/`
+in the log, with no Servo request for example.com after it (the only
+example.com requests in the log came from the launch, before the block);
+Back returned to the file page; Ctrl+Q exited within 5 s. On quit the log
+has seven `WARN profile_traits::mem` "pipe is being closed" lines and one
+`WARN servo_canvas_traits::webgl Could not exit WebGLThread.`, and no
+ERROR or panic; not traced. Not verified: a redirect by hand, DevTools on
+a blocked tab, macOS, and an `<iframe>` onto a blocked site by hand (it is
+denied and reported by design, S15).
 
 Added 2026-10-29: updates over the air (see Conventions and osmena's
 handoff; the flow was exercised in Nautilus on Windows with a local

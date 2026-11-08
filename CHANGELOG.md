@@ -28,6 +28,22 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Added
 
+- Blocked sites. A profile keeps websites it refuses to show, by
+  registrable domain, so blocking `youtube.com` covers every subdomain:
+  "Block on this profile" in a tab's menu (behind a confirmation) or
+  the "Blocked sites" section of the settings window, which is also
+  the only place a site is unblocked. Typed addresses are stopped by
+  the shell; links, scripts and forms are denied in Servo's navigation
+  hook before any request goes out, and the tab shows a block page
+  over `about:blank` with the attempted address in the address bar.
+  Back returns to the page before; Reload re-rolls the page's line;
+  unblocking brings the tabs back. Two limits of Servo's hook (S15):
+  it does not tell the main frame from an `<iframe>`, so a frame
+  pointing at a blocked site blocks its whole tab too; and it sees
+  neither redirects, nor a popup's first page, nor Back and Forward,
+  so a blocked site reached those ways is requested once before the
+  block page replaces it (osmena, with `request_navigation` and
+  `location.replace` here).
 - Restored tabs show their favicons and fresh titles without being
   opened: after "Continue where you left off" brings a session back,
   the tabs that wait for a click are loaded out of sight one after

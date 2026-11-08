@@ -249,6 +249,20 @@ impl TabHostApi for TabHost {
         self.with(tab, |w| w.load(url));
     }
 
+    /// `location.replace` swaps the current entry for the blank page;
+    /// `load` would add one and leave the blocked page behind Back. It
+    /// is a script navigation, so it passes `request_navigation`
+    /// (`about:blank` has no site).
+    fn replace_with_blank(&self, tab: TabId) {
+        self.with(tab, |w| {
+            w.evaluate_javascript("location.replace('about:blank')", move |r| {
+                if let Err(e) = r {
+                    log::warn!("tab {tab:?}: location.replace to about:blank failed: {e:?}");
+                }
+            });
+        });
+    }
+
     fn back(&self, tab: TabId) {
         self.with(tab, |w| {
             if w.can_go_back() {

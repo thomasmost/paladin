@@ -60,6 +60,12 @@ sibling; this repository holds what is Servo's.
 - **Page zoom.** Ctrl and + or − (or the wheel) zoom the page through
   Chromium's steps; every tab on the site follows and the site remembers
   its level; a chip beside the address bar shows it; Ctrl+0 resets.
+- **Blocked sites.** A per-profile list of websites the browser refuses
+  to show, by registrable domain; a tab's menu blocks a site behind a
+  confirmation, the settings window lists and unblocks them. Servo's
+  navigation hook denies links, scripts and forms to a blocked site
+  before any request; the shell stops typed addresses. The tab shows a
+  block page instead (osmena).
 - **Bookmarks.** The star beside the address bar (or Ctrl+D) bookmarks
   the page and opens a popover to name it, pick its group, or remove it;
   the bookmarks bar (Ctrl+Shift+B) shows the "Bookmarks bar" group as
@@ -317,6 +323,17 @@ or engine glue. Each item must pass.
     out and the landing page or feed renders and scrolls. (Script animations
     are sampled by Paladin's Servo and stylo forks; see
     `docs/upstream-issues.md`, "Carried in the fork".)
+15. **Blocked sites.** On example.com, right-click the tab and pick
+    "Block on this profile": the dialog names example.com and warns that
+    only the settings window unblocks; Block turns the page into the
+    profile colour's gradient with one of three lines and "example.com
+    is blocked on this profile" beneath; the address bar still reads
+    `https://example.com/`. Reload changes the line. Back goes to the
+    page before. Type `example.com/other` and press Enter: the block
+    page at once. On another page, click a link to example.com: the
+    block page, with `blocked navigation to` in the log. Open the
+    settings window: "Blocked sites" lists `example.com`; Remove brings
+    the tab back to example.com without asking.
 
 ## Packaging
 
@@ -405,6 +422,13 @@ Upstream causes and the features they block are tracked in
   nothing (Servo 0.7.0 has no API to search a page; S13).
 - No downloads: a link to a file loads nothing, and the Downloads
   entries are disabled (Servo 0.7.0 has no download hook; S14).
+- Blocked sites and Servo's navigation hook (S15): a blocked site
+  inside an `<iframe>` blocks the whole tab, since `request_navigation`
+  does not say which frame is navigating, so Paladin denies and reports
+  every navigation to a blocked site; and a redirect, a popup's first
+  page, or Back and Forward onto a blocked site are requested once
+  before the block page replaces them, since the hook does not see
+  them. Typed addresses, links, scripts and forms are never requested.
 - Without the system title bar, Windows 11's snap-layouts flyout on the
   maximize control is not available (snap by dragging still is), and the
   frameless window has not been tried on macOS.

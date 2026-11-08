@@ -4,12 +4,13 @@ use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, VecDeque};
 
 use osmena_core::{
-    EditState, EngineEvent, Favicon, LoadState, Media, MediaKind, PageContext, PendingTab, TabId,
+    BlockedSites, EditState, EngineEvent, Favicon, LoadState, Media, MediaKind, PageContext,
+    PendingTab, TabId,
 };
 use servo::{
     ConsoleLogLevel, ContextMenu, ContextMenuElementInformationFlags, CreateNewWebViewRequest,
-    EmbedderControl, EmbedderControlId, Image, LoadStatus, PixelFormat, ServoDelegate, ServoError,
-    WebView, WebViewDelegate, WebViewId,
+    EmbedderControl, EmbedderControlId, Image, LoadStatus, NavigationRequest, PixelFormat,
+    ServoDelegate, ServoError, WebView, WebViewDelegate, WebViewId,
 };
 use url::Url;
 
@@ -27,6 +28,9 @@ pub(crate) struct DelegateState {
     /// The context menu Servo asked for in each tab and has not heard
     /// back about; dropping one tells Servo it was dismissed.
     context_menus: RefCell<HashMap<TabId, ContextMenu>>,
+    /// The sites the profile blocks, as the shell last said; a page's
+    /// navigation to one is denied in `request_navigation`.
+    blocked: RefCell<BlockedSites>,
 }
 
 impl DelegateState {
@@ -61,6 +65,10 @@ impl DelegateState {
         self.events.borrow_mut().push_back(event);
     }
 
+    pub(crate) fn set_blocked_sites(&self, sites: BlockedSites) {
+        *self.blocked.borrow_mut() = sites;
+    }
+
     fn tab(&self, webview: &WebView) -> Option<TabId> {
         let tab = self.tabs.borrow().get(&webview.id()).copied();
         if tab.is_none() {
@@ -70,10 +78,42 @@ impl DelegateState {
     }
 }
 
+/// Whether `request_navigation` denies a load of `url`: its site is
+/// blocked. Anything without a site (`about:blank`, which the block
+/// page sits over, `data:`, `view-source:`) passes. Over a plain URL
+/// so tests need no Servo.
+pub(crate) fn blocked_navigation(sites: &BlockedSites, url: &Url) -> bool {
+    sites.blocks(url).is_some()
+}
+
 impl WebViewDelegate for DelegateState {
     fn notify_url_changed(&self, webview: WebView, url: Url) {
         if let Some(tab) = self.tab(&webview) {
             self.push(EngineEvent::UrlChanged { tab, url });
+        }
+    }
+
+    /// Every navigation page content starts (a link, a script, a form),
+    /// before any request. One to a blocked site is denied and
+    /// reported, and the model puts the block page up. Servo does not
+    /// say whether the main frame or an `<iframe>` is navigating, so a
+    /// blocked frame inside an allowed page blocks the whole tab too
+    /// (S15 in `docs/upstream-issues.md`). The loads the embedder
+    /// starts (`WebView::load`, Back, Forward) never come here; the
+    /// model's guard covers them.
+    fn request_navigation(&self, webview: WebView, request: NavigationRequest) {
+        let Some(tab) = self.tab(&webview) else {
+            // Not a tab of ours (a popup not yet adopted): let it be.
+            request.allow();
+            return;
+        };
+        if blocked_navigation(&self.blocked.borrow(), &request.url) {
+            let url = request.url.clone();
+            log::info!("tab {tab:?}: blocked navigation to {url}");
+            request.deny();
+            self.push(EngineEvent::NavigationBlocked { tab, url });
+        } else {
+            request.allow();
         }
     }
 
@@ -279,7 +319,43 @@ fn favicon_from_pixels(
 
 #[cfg(test)]
 mod tests {
-    use super::{PixelFormat, favicon_from_pixels};
+    use osmena_core::BlockedSites;
+    use url::Url;
+
+    use super::{PixelFormat, blocked_navigation, favicon_from_pixels};
+
+    fn blocking(site: &str) -> BlockedSites {
+        let mut b = BlockedSites::default();
+        b.add(site);
+        b
+    }
+
+    fn u(s: &str) -> Url {
+        Url::parse(s).unwrap()
+    }
+
+    #[test]
+    fn a_load_of_a_blocked_site_or_its_subdomain_is_denied() {
+        let b = blocking("example.com");
+        assert!(blocked_navigation(&b, &u("https://example.com/page")));
+        assert!(blocked_navigation(&b, &u("https://www.example.com/")));
+        assert!(blocked_navigation(&b, &u("http://m.example.com:8080/x?y")));
+        assert!(!blocked_navigation(&b, &u("https://notexample.com/")));
+        assert!(!blocked_navigation(&b, &u("https://example.org/")));
+    }
+
+    #[test]
+    fn pages_without_a_site_pass() {
+        let b = blocking("example.com");
+        for url in [
+            "about:blank",
+            "data:text/html,<a href='https://example.com/'>x</a>",
+            "view-source:https://example.com/",
+            "file:///C:/x.html",
+        ] {
+            assert!(!blocked_navigation(&b, &u(url)), "{url}");
+        }
+    }
 
     fn rgba_of(format: PixelFormat, width: u32, height: u32, data: &[u8]) -> Option<Vec<u8>> {
         favicon_from_pixels(format, width, height, data).map(|f| f.rgba.to_vec())

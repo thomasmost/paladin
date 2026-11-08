@@ -5,7 +5,7 @@ use std::path::Path;
 use std::rc::Rc;
 use std::sync::{Arc, Once};
 
-use osmena_core::{EngineEvent, EngineInfo, PageTools, PendingTab};
+use osmena_core::{BlockedSites, EngineEvent, EngineInfo, PageTools, PendingTab};
 use osmena_engine::raw_window_handle::{DisplayHandle, WindowHandle};
 use osmena_engine::{EngineError, PhysicalSize, Waker};
 use servo::{EventLoopWaker, Opts, Preferences, Servo, ServoBuilder};
@@ -173,6 +173,10 @@ impl osmena_engine::Engine for Engine {
         scale: f32,
     ) -> Result<TabHost, EngineError> {
         TabHost::new(self, surface, scale)
+    }
+
+    fn configure_blocked_sites(&self, sites: BlockedSites) {
+        self.delegate.set_blocked_sites(sites);
     }
 }
 

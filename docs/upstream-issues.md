@@ -246,6 +246,29 @@ or starts with the workaround noted in the entry.
   updater's client) and reports `EngineEvent::DownloadUpdated`; set
   `downloads: true` in `engine.rs` and remove the README entry.
 
+### S15: `request_navigation` cannot tell a frame from the main frame, and misses some loads
+
+- **Upstream:** no issue found. `WebViewDelegate::request_navigation` in
+  servo 0.7.0 receives a `NavigationRequest` whose `pipeline_id` is
+  `pub(crate)`, so an embedder cannot tell a top-level navigation from a
+  nested `<iframe>`'s. The hook fires only for script-initiated loads
+  (`schedule_navigation`, reached from `ScriptToConstellationMessage::LoadUrl`)
+  and `WebView::reload`. Embedder loads (`WebView::load`), a new WebView's
+  first URL (popups), history traversal and HTTP redirects bypass it.
+- **Effect:** Paladin denies a navigation to a blocked site whichever frame
+  makes it, so a frame pointing at a blocked site takes the tab to the
+  block page. A blocked site reached by a redirect, a popup's first page,
+  or Back and Forward is requested once and loaded before osmena's
+  `UrlChanged` re-block replaces it with `about:blank`. Typed addresses are
+  stopped by osmena's model guard before Servo sees them.
+- **Blocks:** nothing outright. It limits osmena's blocked sites (the
+  profile's list) to the navigations the hook sees: the frame and the
+  missed loads are the gaps.
+- **When it lands:** the frame (or at least "is top-level") on
+  `NavigationRequest`, and the hook on redirects and popups' first loads;
+  then drop the README's known-limitation entry and the CHANGELOG's two
+  limits.
+
 ## egui and winit
 
 None yet. The IME item looked like one; see Checked and not upstream.
