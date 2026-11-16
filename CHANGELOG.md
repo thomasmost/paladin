@@ -24,6 +24,10 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Fixed
 
+- Alt codes typed nothing on Windows: Alt+0151 on the numeric keypad
+  now types an em dash in the address bar and the chrome's other
+  fields (osmena). A page is handed the character as committed text,
+  Servo's composition end; that path has not been tried by hand.
 - Tab titles sat a pixel or two above the centre line of their
   favicon since they were made smaller: they were centred by a band
   that counted descenders in, which few letters have. They are centred
