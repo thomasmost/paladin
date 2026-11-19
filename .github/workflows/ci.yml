@@ -50,9 +50,18 @@ jobs:
       # fails mozangle's bindings as soon as nothing caches them.
       - name: Install LLVM (Windows)
         if: runner.os == 'Windows'
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "22.1"
+        shell: pwsh
+        # The installer from LLVM's own release, unpacked with 7-Zip as
+        # KyleMayes/install-llvm-action does it; that action's v2 has
+        # no 22.1 for Windows.
+        run: |
+          $version = "22.1.8"
+          $installer = Join-Path $env:RUNNER_TEMP "llvm-$version.exe"
+          curl.exe -fsSL --retry 3 -o $installer "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/LLVM-$version-win64.exe"
+          7z x $installer "-oC:\Program Files\LLVM" -y | Out-Null
+          if (-not (Test-Path "C:\Program Files\LLVMin\libclang.dll")) { throw "no libclang.dll after unpacking LLVM $version" }
+          & "C:\Program Files\LLVMin\clang.exe" --version
+          "LLVM_PATH=C:\Program Files\LLVM" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Set LIBCLANG_PATH (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -144,9 +153,18 @@ jobs:
           python-version: "3.12"
       - name: Install LLVM (Windows)
         if: runner.os == 'Windows'
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "22.1"
+        shell: pwsh
+        # The installer from LLVM's own release, unpacked with 7-Zip as
+        # KyleMayes/install-llvm-action does it; that action's v2 has
+        # no 22.1 for Windows.
+        run: |
+          $version = "22.1.8"
+          $installer = Join-Path $env:RUNNER_TEMP "llvm-$version.exe"
+          curl.exe -fsSL --retry 3 -o $installer "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/LLVM-$version-win64.exe"
+          7z x $installer "-oC:\Program Files\LLVM" -y | Out-Null
+          if (-not (Test-Path "C:\Program Files\LLVMin\libclang.dll")) { throw "no libclang.dll after unpacking LLVM $version" }
+          & "C:\Program Files\LLVMin\clang.exe" --version
+          "LLVM_PATH=C:\Program Files\LLVM" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Set LIBCLANG_PATH (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
