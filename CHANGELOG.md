@@ -8,6 +8,13 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Changed
 
+- Tabs narrow to 40 points, an icon between its paddings, before the
+  strip scrolls, where every tab stopped at 64 (osmena). The active
+  tab keeps 64, so its close control always shows, and a tab that is
+  recording keeps room for its mark. A tab grows to its width when it
+  is selected, its close control fading in, and shrinks back when
+  another is. A narrow inactive tab is closed with the middle button
+  or once selected.
 - osmena's strip can mark a tab whose page is using the microphone or
   the camera (a fading red dot left of the icon). Paladin shows none
   yet: Servo does not report that use.
