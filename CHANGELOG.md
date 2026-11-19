@@ -8,6 +8,9 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Changed
 
+- osmena's strip can mark a tab whose page is using the microphone or
+  the camera (a fading red dot left of the icon). Paladin shows none
+  yet: Servo does not report that use.
 - The strip's "+" no longer scrolls out of sight when there are more
   tabs than fit, and the window can always be moved: a stretch right
   of the "+" is kept free of tabs as the drag area, marked by a grip
