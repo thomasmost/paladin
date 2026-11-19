@@ -45,11 +45,14 @@ jobs:
           python-version: "3.12"
 
       # bindgen (used by Servo's ANGLE bindings) loads libclang at build time.
+      # Its version follows the runner image's MSVC: the STL of 14.52
+      # refuses a Clang older than 22 (error STL1000), so an older libclang
+      # fails mozangle's bindings as soon as nothing caches them.
       - name: Install LLVM (Windows)
         if: runner.os == 'Windows'
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "20.1"
+          version: "22.1"
       - name: Set LIBCLANG_PATH (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -143,7 +146,7 @@ jobs:
         if: runner.os == 'Windows'
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "20.1"
+          version: "22.1"
       - name: Set LIBCLANG_PATH (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
