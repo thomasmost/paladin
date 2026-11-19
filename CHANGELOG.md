@@ -8,6 +8,20 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Changed
 
+- The strip's "+" no longer scrolls out of sight when there are more
+  tabs than fit, and the window can always be moved: a stretch right
+  of the "+" is kept free of tabs as the drag area, marked by a grip
+  of dots that lights under the pointer (osmena).
+- The Launch Panel's field completes to a page, without the `?query`
+  and `#fragment` an address in the history may carry (osmena): `sho`
+  completes to `shop.example/list`, not to
+  `shop.example/list?page=2&sid=…`. The matches under the field still
+  list the full addresses.
+- The Launch Panel opens a typed address as typed (osmena). Typing
+  `docs.rs`, or a whole URL, and pressing Enter went to the most
+  visited page starting with it, often one deep inside the site; the
+  field now completes only the host still being typed, or the very
+  page typed, and never adds a path to an address.
 - The chrome's look, after Thorium with Zen's softness (osmena): the
   toolbar's Back, Forward, Reload and Stop are painted glyphs in round
   buttons that fill only under the pointer and fade when they cannot
