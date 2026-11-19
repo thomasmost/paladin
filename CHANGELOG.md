@@ -51,6 +51,9 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Fixed
 
+- Two fingers spread or pinched on a touchpad zoom the page, a step
+  at a time, as Ctrl (Cmd) and the wheel do (osmena). Before, the
+  gesture scrolled the page on Windows and did nothing on macOS.
 - Alt codes typed nothing on Windows: Alt+0151 on the numeric keypad
   now types an em dash in the address bar and the chrome's other
   fields (osmena). A page is handed the character as committed text,
