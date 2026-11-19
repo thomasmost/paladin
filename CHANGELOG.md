@@ -8,6 +8,16 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Changed
 
+- Paladin still runs one process per profile: osmena can now run every
+  profile in one process for an engine that allows it, and Servo's
+  options and preferences (the profile's directory among them) are the
+  process's, so `INFO.profiles_in_process` is false and opening another
+  profile starts another Paladin, as before. Two things do change with
+  osmena: a start with no `--profile` is the default profile by rule,
+  not by the option's default value, and the hidden `--data-dir <dir>`
+  keeps every profile under `<dir>` (for scripted runs). The minimum
+  Rust version is 1.89, osmena's.
+
 - A strip with more tabs than fit says which way the rest are: the
   row fades into the strip at an end with tabs scrolled out of sight
   beyond it, instead of being cut off (osmena).

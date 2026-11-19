@@ -51,8 +51,10 @@ fn main() -> ExitCode {
         brand: &brand::BRAND,
         engine: &paladin_engine::INFO,
         args: cli.base,
-        start_engine: Box::new(move |dir, waker| {
-            paladin_engine::Engine::new(dir, waker, multiprocess)
+        // Servo's options are the process's: one profile, one process
+        // (`INFO.profiles_in_process` is false), so this runs once.
+        start_engine: Box::new(move |profile, waker| {
+            paladin_engine::Engine::new(&profile.engine_dir, waker, multiprocess)
         }),
     })
 }

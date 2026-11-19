@@ -6,7 +6,9 @@ model, the egui chrome, and the winit application come from
 with Nautilus (Chromium). This repository holds only what is Servo's: the
 engine crate, the forks, and the binary that brands it.
 
-_Last updated: 2026-11-08 (blocked sites over Servo's navigation hook
+_Last updated: 2026-11-19 (osmena's start closure takes the profile;
+Paladin stays one process per profile, `INFO.profiles_in_process` is
+false; before that 2026-11-08, blocked sites over Servo's navigation hook
 (osmena's list and block page; frames too, S15); before that osmena's
 restored tabs warmed one by one for their titles and favicons; before
 that osmena's session restore; `EngineInfo::downloads` is false, S14;
@@ -176,7 +178,13 @@ Run from the repo root:
   change before republishing (the list is in that entry).
 - **One `Engine` per process.** Servo's options are process-global, so each
   engine test binary (`headless`, `web_animations`) holds a single test
-  function that builds one engine.
+  function that builds one engine. For the same reason
+  `INFO.profiles_in_process` is false: osmena then opens one profile per
+  process and calls the start closure once (with the profile, whose
+  `engine_dir` is Servo's `config_dir`), and "open in another profile"
+  starts the executable again. Running every profile in one process, as
+  Nautilus does, needs a Servo whose `Opts` (`config_dir`) and
+  preferences are per instance.
 - **Web Animations pages report through the title.** Each page in
   `crates/paladin-engine/tests/pages/` sets `document.title` to `PASS` or
   `FAIL: <reason>` exactly once, with an error listener and, if it waits for
@@ -267,6 +275,25 @@ A task is complete only when:
   issues Paladin depends on and the features each one blocks. Add an entry
   when a bug or feature turns out to be upstream; re-check every `S` entry on
   a Servo bump.
+
+## Status and handoff (2026-11-19, osmena's profiles in one process)
+
+osmena can run every open profile in one process (its handoff of the
+same date). Paladin does not: see the "One `Engine` per process"
+convention. What changed here is the start closure's signature (it
+takes the `Profile`) and the new `EngineInfo` field, set to false.
+
+Merged to `main` on 2026-11-20 with osmena at `64da3e9`. Verified on
+the Mac (Apple silicon), against that osmena through a patch table: `cargo check --workspace --all-targets`,
+`cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt
+--all --check`, and a debug build run twice at once on a scratch
+`--data-dir`, the default profile and `--profile work`: two processes,
+each loaded its page ("Example Domain" in the `--exit-after` line) and
+exited 0, and the data directory got no `instance.lock` and no
+`open-profiles.toml` (those are for an engine that runs profiles
+together). Not verified: `cargo test --workspace` (the engine test
+binaries were not run), "open in another profile" from the menus (it
+starts the executable again, as before; nothing clicked it), Windows.
 
 ## Status and handoff (2026-10-19)
 

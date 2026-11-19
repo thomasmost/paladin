@@ -33,6 +33,9 @@ pub static INFO: EngineInfo = EngineInfo {
     // tools window to offer; the page menu keeps the model's entries and
     // the editing basics.
     page_tools: PageTools::NONE,
+    // Servo's options and preferences (the profile's directory among
+    // them) are process-global: another profile is another process.
+    profiles_in_process: false,
 };
 
 #[derive(Clone)]
