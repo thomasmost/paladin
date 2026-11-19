@@ -62,6 +62,11 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Added
 
+- The Launch Panel's field asks as well as searches (osmena): tap
+  Shift twice and the field's text becomes a question, opened by
+  Enter in Claude or ChatGPT, whichever the Launch Settings' new
+  "Ask with" row names; the chip at the field's right end says which.
+  Shift twice again goes back to searching.
 - The Launch Panel's field completes an address ahead of the typist
   (osmena). Before the first space, the most visited page whose
   address starts with the typing stands in the field, the rest of its
