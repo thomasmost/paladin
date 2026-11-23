@@ -8,6 +8,15 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Changed
 
+- The profile avatars are redrawn as plain silhouettes that read on
+  the toolbar's small disc, where the outlined emoji they had been
+  since the palettes turned to grey there. The whale is the one
+  profiles had before the palettes. The emoji faces are their features
+  on the disc itself. Every avatar keeps its name and its place in the
+  dialog (osmena 7e4ebfa).
+- The toolbar's and the strip's glyphs are drawn on one grid in one
+  weight and are sharp at 100% scale; the Launch Settings' gear is a
+  cog.
 - Paladin still runs one process per profile: osmena can now run every
   profile in one process for an engine that allows it, and Servo's
   options and preferences (the profile's directory among them) are the
@@ -61,6 +70,8 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Fixed
 
+- The toolbar's Reload is an arrow again, an arc turning clockwise
+  into an arrowhead; it had been drawn as a ring with a tick on it.
 - Two fingers spread or pinched on a touchpad zoom the page, a step
   at a time, as Ctrl (Cmd) and the wheel do (osmena). Before, the
   gesture scrolled the page on Windows and did nothing on macOS.
