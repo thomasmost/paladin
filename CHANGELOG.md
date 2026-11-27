@@ -76,6 +76,12 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Fixed
 
+- A folder's chip no longer sits on top of one of its window's tabs.
+  A folder and a tab that happened to carry the same number inside
+  the browser (the first folder made in a window, and its first tab)
+  were slid along the strip as one thing, so both were drawn halfway
+  between their two places, the chip over the tab and the row pushed
+  right (osmena 13b073b).
 - macOS: a tab can be dragged from anywhere on it. The hidden title
   bar lies over the upper part of the strip, and a press there moved
   the window instead of starting a drag of the tab. The window is
