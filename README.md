@@ -212,10 +212,15 @@ or engine glue. Each item must pass.
    profile directory). Right-click an unselected tab: it becomes the active
    and only selected tab and the menu says "Close tab". Open a second window
    with Cmd+N, select two tabs in the first, and drag one of them onto the
-   second window: both appear at the end of its strip (reloaded, with the
-   previously active one active) and leave the first. Drag a tab onto the
-   desktop: it opens in a new window. Dropping within the same window does
-   nothing. "Open tab in profile" starts a second Paladin for that profile
+   second window's strip: both appear in the gap they were dropped on, or
+   at the end of the strip when dropped elsewhere on that window (reloaded,
+   with the previously active one active), and leave the first. Drag a tab
+   more than its height off the strip: it rides with the pointer, and let
+   go over the desktop or over its own window's page it opens in a new
+   window under the pointer; Escape during a drag puts it back. Dropping
+   every tab of a window on that window does nothing. On macOS a press
+   anywhere on a tab, its upper part included, drags the tab and not the
+   window. "Open tab in profile" starts a second Paladin for that profile
    with the tab's URL and closes the tab here. Both this menu and the "☰"
    menu are the system's own popup menus (native look, Escape closes them,
    shortcuts shown the platform way), not egui.

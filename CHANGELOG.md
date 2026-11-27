@@ -8,6 +8,12 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Changed
 
+- Tabs dragged off the strip and let go over their own window (over
+  the page, say) open in a new window there; it used to do nothing.
+  Dropping every tab of a window on that window still does nothing.
+  Of several windows under dropped tabs, the one in front takes them,
+  the dragged tabs' own window included, and a minimized window takes
+  none (osmena 880642d).
 - The profile avatars are redrawn as plain silhouettes that read on
   the toolbar's small disc, where the outlined emoji they had been
   since the palettes turned to grey there. The whale is the one
@@ -70,6 +76,21 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Fixed
 
+- macOS: a tab can be dragged from anywhere on it. The hidden title
+  bar lies over the upper part of the strip, and a press there moved
+  the window instead of starting a drag of the tab. The window is
+  moved by the grip and the empty stretch right of the "+" (a
+  double-click there still zooms it); a window with the system title
+  bar is as before (osmena 880642d).
+- A drag of tabs no longer ends when the pointer leaves the window,
+  and it is called off, the tabs staying where they were, when the
+  window loses the keyboard or goes full screen; before, the next
+  click could tear the tabs off. A dragged tab keeps the point it was
+  taken by under the pointer, where a narrow tab that grew as its drag
+  began rode off-centre and could land a place too far right
+  (osmena 880642d).
+- Two folders of one name in a window stay two folders when the
+  session is restored (osmena 880642d).
 - The toolbar's Reload is an arrow again, an arc turning clockwise
   into an arrowhead; it had been drawn as a ring with a tick on it.
 - Two fingers spread or pinched on a touchpad zoom the page, a step
@@ -99,6 +120,16 @@ releases yet; `Unreleased` holds everything on `main`.
 
 ### Added
 
+- Tabs tear off. A drag pulled more than a tab's height above or below
+  the strip is detached and rides with the pointer; let go, the tabs
+  get a window of their own, the size of the one they left, placed so
+  they are under the pointer where they were held. Dropped on another
+  window's strip they land in the gap they were dropped on (anywhere
+  else on that window, at the end). A folder is dragged by its chip,
+  along the strip or to another window or one of its own, and arrives
+  as the folder it was; a click on the chip still drops its list down.
+  A drag held at an end of a crowded strip scrolls it, and Escape
+  calls a drag off (osmena 880642d).
 - The icon at the left end of the Launch Panel's field says what Enter
   will open (osmena): the site's own favicon for a page, a magnifier
   for a search, sparkles for a question.
